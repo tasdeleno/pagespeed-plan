@@ -108,6 +108,53 @@ def audit_savings(a):
             by if isinstance(by, (int, float)) else None)
 
 
+def _detail_value(v):
+    """Bir details item degerini kisa, okunabilir bir sey'e indirger.
+    Lighthouse'un node/url/kod sarmallarini 'selector - snippet' gibi acar."""
+    if isinstance(v, bool):
+        return None  # bool, int'in alt-turudur; gurultu, atla
+    if isinstance(v, (int, float)):
+        return v
+    if isinstance(v, str):
+        return v.strip()[:180] or None
+    if isinstance(v, dict):
+        if v.get("type") == "node":
+            sel = (v.get("selector") or v.get("nodeLabel") or "").strip()
+            snip = (v.get("snippet") or "").strip()
+            s = f"{sel} — {snip}" if sel and snip else (sel or snip)
+            return s[:180] or None
+        for k in ("url", "value", "text", "name", "location"):
+            if v.get(k) not in (None, ""):
+                return str(v[k])[:180]
+    return None
+
+
+def extract_details(a, cap=12):
+    """Bir denetimin details.items'indan SOMUT KANIT uretir (hangi element + deger).
+    color-contrast / tap-targets / image-alt gibi denetimlerde PSI sayfasindaki
+    'hangi element, ne kadar, hedef ne' bilgisini plana tasir. cap ile sinirlanir."""
+    items = (a.get("details") or {}).get("items") or []
+    if not items:
+        return None
+    rows = []
+    for it in items[:cap]:
+        if not isinstance(it, dict):
+            continue
+        row = {}
+        for k, v in it.items():
+            fv = _detail_value(v)
+            if fv is not None:
+                row[k] = fv
+        if row:
+            rows.append(row)
+    if not rows:
+        return None
+    out = {"items": rows}
+    if len(items) > cap:
+        out["truncated"] = len(items) - cap
+    return out
+
+
 def audits_by_category(lh):
     """Her kategoride PSI'nin gosterdigi TUM gruplu denetimleri dondurur
     (firsatlar + tanilar + insights). 'metrics' grubu ve gizli (grupsuz) denetimler haric."""
@@ -132,7 +179,7 @@ def audits_by_category(lh):
             score = a.get("score")
             ms, by = audit_savings(a)
             passed = (score is not None and score >= 0.9)
-            rows.append({
+            row = {
                 "id": aid,
                 "title": a.get("title"),
                 "group": gid,
@@ -145,8 +192,13 @@ def audits_by_category(lh):
                 "savingsBytes": by,
                 "metricSavings": a.get("metricSavings") or None,
                 "weight": ref.get("weight", 0),
-                "description": (a.get("description") or "").strip()[:500],
-            })
+                "description": (a.get("description") or "").strip()[:1200],
+            }
+            if not passed:
+                det = extract_details(a)
+                if det:
+                    row["details"] = det  # hangi element/deger (kontrast, tap-target, alt...)
+            rows.append(row)
         rows.sort(key=lambda x: (
             0 if not x["passed"] else 1,
             -(x["savingsMs"] or 0),

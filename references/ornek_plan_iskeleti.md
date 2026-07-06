@@ -28,9 +28,11 @@
 ### Performans
 - ...
 ### SEO
-- Meta aciklamasi ekle (meta-description)
-### Erisilebilirlik
-- Resimlere alt metni ekle (image-alt); renk kontrastini WCAG AA'ya cikar
+- Meta aciklamasi ekle (meta-description) — su an eksik; ~150 karakter, anahtar niyetli yaz.
+### Erisilebilirlik (somut kanit — `details`'ten)
+- **Kontrast** (color-contrast): `button.cta` metni 2,1:1 → hedef WCAG AA 4,5:1; renk tonunu koyulastir.
+- **Dokunma hedefi** (target-size): `a.nav-link` 24×24 px → en az 48×48 px, 8 px bosluk.
+- **Alt metin** (image-alt): `img.hero` alt eksik → urunu tarif eden anlamli alt ekle.
 ### En Iyi Uygulamalar
 - ...
 

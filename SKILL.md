@@ -8,7 +8,8 @@ description: >-
   "site hiz denetimi", "performans/SEO/erisilebilirlik denetimi", "Core Web Vitals",
   "Lighthouse skoru", "hiz optimizasyonu plani", "pagespeed skorlarina gore plan hazirla".
   Hem Cowork'te hem Claude Code CLI'da calisir. Ciktiyi bir .md dosyasina yazar ve
-  sohbette ozetini gosterir. SEO/projeye ozel derinlik icin claude-seo skill'ine devreder.
+  sohbette ozetini gosterir. SEO/teknik/erisilebilirlik derinligi YERLESIKTIR (references/);
+  claude-seo gerekmez, kuruluysa opsiyonel ekstra derinlik icin devredilir.
 ---
 
 # PageSpeed Insights Denetim + Plan
@@ -16,7 +17,8 @@ description: >-
 Bir URL'yi Google PageSpeed Insights API'siyle (Lighthouse motoru) test eder ve
 **PSI sayfasinda gorunen her seyi** (firsatlar + tanilar + yeni "Insights" denetimleri +
 teknolojiye ozel oneriler) onceliklendirilmis bir eylem planina cevirir.
-SEO ve projeye ozel aksiyon derinligi icin `claude-seo` skill'ine devreder.
+SEO / teknik / erisilebilirlik derinligi **yerlesiktir** (`references/` dosyalari); `claude-seo`
+kurulu OLMASA da plan tam yazilir. claude-seo kuruluysa opsiyonel ekstra derinlik icin devredilir.
 
 ## Ne zaman kullanilir
 Kullanici bir sitenin/URL'nin hizini, Core Web Vitals'ini, SEO/erisilebilirlik/best-practices
@@ -25,6 +27,8 @@ durumunu olcmek ve **ne yapilmasi gerektigine dair plan** istediginde.
 ## Gereksinimler
 - Python 3 (yalnizca standart kutuphane; `pip install` gerekmez).
 - Internet erisimi (googleapis.com'a).
+- **`claude-seo` GEREKMEZ.** SEO/teknik/erisilebilirlik derinligi `references/` altinda yerlesiktir.
+  claude-seo kuruluysa opsiyonel devir yapilir; degilse plan yine tam yazilir.
 - Opsiyonel `PSI_API_KEY` ortam degiskeni. Anahtarsiz da calisir ama Google dusuk
   hiz limiti uygular; medyan-of-3 birden fazla istek attigi icin anahtar onerilir.
   Ucretsiz anahtar: Google Cloud Console > "PageSpeed Insights API"'yi etkinlestir > Credentials > API key.
@@ -48,7 +52,10 @@ durumunu olcmek ve **ne yapilmasi gerektigine dair plan** istediginde.
    - **`auditsByCategory`**: her kategoride PSI'de gorunen **TUM** denetimler — firsatlar,
      tanilar (cache politikasi, byte agirligi, DOM vb.) ve yeni **insights** (or. resim teslimi).
      Her denetimde: `passed`, `score`, `group`/`groupTitle`, `display`, `savingsMs`,
-     `savingsBytes`, `weight`, `description` (duzeltme rehberi).
+     `savingsBytes`, `weight`, `description` (duzeltme rehberi/ONERI) ve `passed=false` ise
+     **`details`**: PSI sayfasindaki SOMUT KANIT — hangi element (selector/snippet), hangi deger
+     (kontrast orani, tap-target boyutu, alt'sizgorsel vb.) ve hedef. Kontrast/buton boyutu/alt
+     gibi bulgulari somutlastirir. Cok kalemliyse `details.truncated` kalan sayisini verir.
    - `opportunities`: kazanci (`savingsMs`) olan denetimler, kazanca gore sirali (oncelik icin).
    - `thirdParties`: en cok engelleyen ucuncu taraf servisler.
    - `resourceSummary`: kaynak turune gore istek + boyut.
@@ -56,7 +63,8 @@ durumunu olcmek ve **ne yapilmasi gerektigine dair plan** istediginde.
      gizledigi sisman tek dosyayi (cogu zaman logo/header ikonu) yuzeye cikarir — bunu daima gozden gecir.
    - `stackPacks`: **teknolojiye ozel oneriler** (WordPress, WooCommerce, React vb.).
    - `warnings` / `errors`: kismi/tam basarisizlik nedeni.
-4. **SEO ve projeye ozel derinlik icin `claude-seo` skill'ini cagir** (asagidaki bolum).
+4. **SEO / teknik / erisilebilirlik derinligi icin `references/` dosyalarini kullan** (asagidaki
+   bolum). claude-seo kuruluysa opsiyonel olarak ek derinlik icin cagir.
 5. Iki kaynagi birlestirip asagidaki formatta **tek bir plan** yaz. `.md` dosyasina kaydet
    (or. `<alanadi>-pagespeed-plani.md`) ve sohbette kisa ozet goster.
 
@@ -64,21 +72,32 @@ durumunu olcmek ve **ne yapilmasi gerektigine dair plan** istediginde.
 Plan, PSI'de gorunen hicbir bulguyu atlamamali:
 - `auditsByCategory`'deki **passed=false olan HER denetim** plana girsin — grup grup
   (or. "Firsatlar", "Tanilar", "Insights") baslikla; `counts.duzeltilecek` ile sayisi tutmali.
-- Her maddede denetimin adi + `display` degeri + varsa `savingsMs` + `description`'dan
-  cikan somut duzeltme yer alsin.
+- Her maddede denetimin adi + `display` degeri + varsa `savingsMs` + **`description`'dan cikan
+  somut ONERI (ne yapilacak)** yer alsin. **Oneri olmadan bulgu yazma** — bulgu + duzeltme birlikte.
+- **`details` varsa SOMUT KANITI yaz:** hangi element + mevcut deger → hedef. Ornek: kontrast
+  "`.btn-x` 2.1:1 → 4.5:1"; dokunma hedefi "`a.nav` 24×24 → 48×48"; alt "`img.logo` alt eksik".
+  Genel oneri + o sayfaya ozel kanit birlikte olmali (korlemesine "kontrasti duzelt" yetmez).
 - `stackPacks`'teki teknolojiye ozel onerileri ilgili denetimin altina entegre et
   (or. cache icin "WordPress'te su onbellek eklentisi").
 - Gecmis (passed=true) denetimler istege bagli "Gecen denetimler" altinda kisaca ozetlenebilir.
 - Kullanici "ozet" isterse ilk 5-10 onceligi one cikar ama tam listeyi de plana ekle.
 
-## claude-seo devri (derinlestirme)
-Bu skill olcum + performans/teknik tarafina odaklanir. SEO icerigi ve **projeye ozel
-aksiyon** derinligi `claude-seo` skill'inden gelir:
-1. PSI'deki `auditsByCategory.seo` (ve varsa erisilebilirlik) bulgularini topla.
-2. `claude-seo` skill'ini calistir; girdi olarak URL'yi ve bu bulgulari baglam ver.
-3. Ciktisini planin **"SEO / Projeye Ozel Aksiyonlar"** bolumune entegre et (cakisanlari tekille).
-4. `claude-seo` yok/erisilemezse bolumu PSI'nin ham SEO denetimleriyle doldur ve
-   "derin SEO analizi icin claude-seo kurulmali" notu birak.
+## SEO / Teknik / Erisilebilirlik derinligi (yerlesik)
+Bu derinlik **`references/` altinda yerlesiktir**; claude-seo olmadan da tam plan yazilir:
+1. PSI'deki `auditsByCategory.seo` + `accessibility` + `best-practices` bulgularini (her birinin
+   `description` onerisi ve `details` kaniti ile) topla.
+2. Su yerlesik referanslarla derinlestir:
+   - `references/teknik-seo-derin.md` — SEO/teknik denetimler (crawlability, indexability,
+     guvenlik, URL, mobil/dokunma hedefi, JS render) + PSI audit id eslemesi.
+   - `references/core-web-vitals-derin.md` — LCP alt-parcalari, INP/CLS kirilimi, esikler, saha-lab.
+   - `references/seo-performans-ajan.md` — performans teshis yontemi + darbogaz katalogu.
+   - `references/schema-ve-erisilebilirlik.md` — JSON-LD sablonlari + WCAG/a11y denetim eslemesi
+     (kontrast/tap-target/alt icin somut yazim tablosu).
+3. Ciktiyi planin **"SEO / Projeye Ozel Aksiyonlar"** ve **"Erisilebilirlik & En Iyi Uygulamalar"**
+   bolumlerine entegre et (cakisanlari tekille).
+4. **Opsiyonel:** `claude-seo` KURULUYSA, URL + bu bulgulari baglam vererek calistir ve ciktisini
+   ustteki derinlige EK olarak entegre et. Kurulu degilse bu adim atlanir (uyari/eksik notu YOK —
+   yerlesik referanslar zaten yeterli).
 
 ## Plan formati (Markdown)
 1. **Ozet** – URL (gerekirse `finalUrl`/redirect notu), test tarihi, strateji(ler),
@@ -90,8 +109,11 @@ aksiyon** derinligi `claude-seo` skill'inden gelir:
 4. **Tum performans bulgulari** – `auditsByCategory.performance`'in tamami, grup grup
    (Firsatlar / Tanilar / Insights). `thirdParties`, `resourceSummary` ve `largestResources`
    (en agir tekil dosyalar — gizli logo/ikon darbogazini yakalar) ile destekle.
-5. **SEO / Projeye Ozel Aksiyonlar** – `claude-seo` devrinden gelen bolum.
-6. **Erisilebilirlik & En Iyi Uygulamalar** – ilgili `auditsByCategory` denetimlerinin tamami.
+5. **SEO / Projeye Ozel Aksiyonlar** – yerlesik `references/` derinliginden (+ claude-seo kuruluysa).
+   Her madde: PSI SEO denetimi + `description` onerisi + varsa `details` kaniti.
+6. **Erisilebilirlik & En Iyi Uygulamalar** – ilgili `auditsByCategory` denetimlerinin tamami;
+   her bulguda `details` kaniti (hangi element + deger → hedef) somut yazilir. Bkz.
+   `references/schema-ve-erisilebilirlik.md` (kontrast/tap-target/alt yazim tablosu).
 7. **Teknolojiye ozel notlar** – `stackPacks` ozeti.
 8. **Sonraki adimlar / tekrar test** – degisiklik **CANLIYA ciktiktan SONRA** (bkz. "Derin
    teshis" #4 — deploy/cache dogrulamasi) ayni URL'yi yeniden calistir.
