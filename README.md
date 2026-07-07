@@ -16,6 +16,8 @@
   <img alt="MIT" src="https://img.shields.io/badge/license-MIT-black">
 </p>
 
+<p align="center"><b>Türkçe</b> · <a href="README.en.md">English</a></p>
+
 PageSpeed Insights sana skoru ve önerileri verir. `pagespeed-plan` bunları CI'de kırılabilen bir
 bütçe kapısına, dağıtım öncesi/sonrası bir diff'e, sitemap taramasına, paylaşılabilir bir rapora ve
 bir ajanın okuyup uygulayabileceği önceliklendirilmiş bir plana çevirir — Node/Chrome ya da
@@ -50,40 +52,20 @@ sırasına dizilmiş tek bir Markdown planıdır.
 git clone https://github.com/tasdeleno/pagespeed-plan.git ~/.claude/skills/pagespeed-plan
 ```
 
-Claude içinde skill otomatik keşfedilir; betikler bağımsız da çalışır. Opsiyonel `PSI_API_KEY`
-anahtarsız çalışmayı kota sınırına takılmadan hızlandırır (Google Cloud Console → PageSpeed Insights API).
+Hepsi bu — bağımlılık yok. (Opsiyonel: kota için `PSI_API_KEY` ortam değişkeni.)
 
 ## Kullanım
 
-Claude'a *"şu sitenin PageSpeed testini yap"* demen yeterli. Doğrudan komut satırından:
+En kolayı: Claude'a **"şu sitenin PageSpeed testini yap"** de. Komut satırından:
 
 ```bash
-# Tek URL — tam denetim
-python3 scripts/psi_audit.py https://ornek.com --strategy both --runs 3 --out psi.json
-
-# Tüm site — sitemap taraması
-python3 scripts/psi_audit.py --sitemap https://ornek.com/sitemap.xml --max-pages 20 --out site.json
-
-# Görsel kanıt + GEO
-python3 scripts/psi_audit.py https://ornek.com --screenshots ./sc --geo --out psi.json
-
-# CI bütçe kapısı — eşik aşılırsa exit 1
-python3 scripts/psi_audit.py https://ornek.com --budget "perf=90,lcp=2500,cls=0.1"
-
-# Öncesi/sonrası diff — regresyonda exit 1
-python3 scripts/psi_diff.py onceki.json sonraki.json --fail-on-regression
-
-# Paylaşılabilir HTML rapor
-python3 scripts/psi_report.py psi.json --out rapor.html
+python3 scripts/psi_audit.py https://ornek.com --out psi.json         # tek URL
+python3 scripts/psi_audit.py --sitemap https://ornek.com/sitemap.xml  # tüm site
+python3 scripts/psi_audit.py https://ornek.com --budget "perf=90"     # CI kapısı (exit 1)
+python3 scripts/psi_report.py psi.json --out rapor.html               # HTML rapor
 ```
 
-GitHub Actions'ta her PR'da performansı korumak için:
-
-```yaml
-- name: PageSpeed bütçe kapısı
-  env: { PSI_API_KEY: ${{ secrets.PSI_API_KEY }} }
-  run: python3 scripts/psi_audit.py https://siten.com --runs 1 --budget "perf=90,lcp=2500"
-```
+Tüm bayraklar ve `psi_diff`/`contrast` için [Modlar ve betikler](#modlar-ve-betikler).
 
 ## Modlar ve betikler
 
