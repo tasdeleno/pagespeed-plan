@@ -60,8 +60,9 @@ Easiest: tell Claude **"run a PageSpeed test on this site"**. From the command l
 
 ```bash
 python3 scripts/psi_audit.py https://example.com --out psi.json          # single URL
-python3 scripts/psi_audit.py --sitemap https://example.com/sitemap.xml   # whole site
+python3 scripts/psi_audit.py --from-robots https://example.com           # robots.txt → whole site
 python3 scripts/psi_audit.py https://example.com --budget "perf=90"      # CI gate (exit 1)
+python3 scripts/psi_plan.py psi.json --out plan.md                       # deterministic plan (no LLM)
 python3 scripts/psi_report.py psi.json --out report.html                 # HTML report
 ```
 
@@ -82,7 +83,7 @@ For every flag plus `psi_diff`/`contrast`, see [Modes and scripts](#modes-and-sc
 ```mermaid
 flowchart LR
     U([URL · URLs]) --> S["psi_audit.py<br/>stdlib · median-of-N · mobile+desktop"]
-    SM([sitemap.xml]) -.->|parse_sitemap| S
+    SM([sitemap.xml · robots.txt]) -.->|parse_sitemap · --from-robots| S
     S -->|PSI v5 runPagespeed| G[("Google PSI<br/>Lighthouse + CrUX")]
     S -.->|--geo| W[("target site<br/>robots.txt · llms.txt")]
     G --> J[("psi JSON<br/>scores · CWV · auditsByCategory + details<br/>opportunities · screenshots · geo · pages")]
@@ -90,14 +91,18 @@ flowchart LR
     J -->|--budget exceeded| X{{"exit 1 · CI gate"}}
     J --> M["Claude + references/<br/>prioritized plan .md"]
     O[["claude-seo · optional"]] -.-> M
+    J --> PL["psi_plan.py<br/>deterministic plan .md"]
     J --> R["psi_report.py<br/>self-contained HTML"]
+    J -.->|--history| H[("history.jsonl")]
+    H --> T["psi_diff.py --trend<br/>score/CWV trend"]
     P([previous JSON]) --> D["psi_diff.py<br/>before → after · exit 1 on regression"]
     J --> D
 ```
 
-`psi_audit.py` gets lab data from PSI and field data from CrUX; `--geo`/`--sitemap` are fetched directly
-from the target site. The same JSON feeds `--budget` (CI gate), `psi_report.py` (HTML) and `psi_diff.py`
-(comparing two runs); the plan is written by Claude + the built-in `references/` (with `claude-seo` adding depth if installed).
+`psi_audit.py` gets lab data from PSI and field data from CrUX; `--geo`/`--sitemap`/`--from-robots` are
+fetched directly from the target site. The same JSON feeds `--budget` (CI gate), `psi_plan.py` (deterministic
+plan), `psi_report.py` (HTML) and `psi_diff.py` (comparing two runs; `--history` for a trend over time); the
+rich plan is written by Claude + the built-in `references/` (with `claude-seo` adding depth if installed).
 
 ## Where it fits vs other tools
 
@@ -119,7 +124,8 @@ page doesn't do:
 
 The generated Markdown covers summary scores, Core Web Vitals, impact×effort priorities, all
 performance findings, SEO/accessibility actions (each with concrete evidence), stack-specific notes,
-and a post-deploy retest step. Example: [`references/ornek_plan_iskeleti.md`](references/ornek_plan_iskeleti.md).
+and a post-deploy retest step. `psi_plan.py` produces the same skeleton deterministically as a no-LLM
+baseline. Example: [`references/ornek_plan_iskeleti.md`](references/ornek_plan_iskeleti.md).
 
 ## Built-in depth
 

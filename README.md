@@ -59,10 +59,11 @@ Hepsi bu — bağımlılık yok. (Opsiyonel: kota için `PSI_API_KEY` ortam değ
 En kolayı: Claude'a **"şu sitenin PageSpeed testini yap"** de. Komut satırından:
 
 ```bash
-python3 scripts/psi_audit.py https://ornek.com --out psi.json         # tek URL
-python3 scripts/psi_audit.py --sitemap https://ornek.com/sitemap.xml  # tüm site
-python3 scripts/psi_audit.py https://ornek.com --budget "perf=90"     # CI kapısı (exit 1)
-python3 scripts/psi_report.py psi.json --out rapor.html               # HTML rapor
+python3 scripts/psi_audit.py https://ornek.com --out psi.json          # tek URL
+python3 scripts/psi_audit.py --from-robots https://ornek.com           # robots.txt → tüm site
+python3 scripts/psi_audit.py https://ornek.com --budget "perf=90"      # CI kapısı (exit 1)
+python3 scripts/psi_plan.py psi.json --out plan.md                     # deterministik plan (LLM'siz)
+python3 scripts/psi_report.py psi.json --out rapor.html                # HTML rapor
 ```
 
 Tüm bayraklar ve `psi_diff`/`contrast` için [Modlar ve betikler](#modlar-ve-betikler).
@@ -82,7 +83,7 @@ Tüm bayraklar ve `psi_diff`/`contrast` için [Modlar ve betikler](#modlar-ve-be
 ```mermaid
 flowchart LR
     U([URL · URL'ler]) --> S["psi_audit.py<br/>stdlib · medyan-of-N · mobil+masaüstü"]
-    SM([sitemap.xml]) -.->|parse_sitemap| S
+    SM([sitemap.xml · robots.txt]) -.->|parse_sitemap · --from-robots| S
     S -->|PSI v5 runPagespeed| G[("Google PSI<br/>Lighthouse + CrUX")]
     S -.->|--geo| W[("hedef site<br/>robots.txt · llms.txt")]
     G --> J[("psi JSON<br/>skorlar · CWV · auditsByCategory + details<br/>opportunities · screenshots · geo · pages")]
@@ -90,14 +91,18 @@ flowchart LR
     J -->|--budget ihlali| X{{"exit 1 · CI kapısı"}}
     J --> M["Claude + references/<br/>önceliklendirilmiş plan .md"]
     O[["claude-seo · opsiyonel"]] -.-> M
+    J --> PL["psi_plan.py<br/>deterministik plan .md"]
     J --> R["psi_report.py<br/>kendine-yeter HTML"]
+    J -.->|--history| H[("history.jsonl")]
+    H --> T["psi_diff.py --trend<br/>skor/CWV trendi"]
     P([önceki JSON]) --> D["psi_diff.py<br/>öncesi → sonrası · regresyonda exit 1"]
     J --> D
 ```
 
-`psi_audit.py` ölçümü PSI'den, saha verisini CrUX'tan alır; `--geo`/`--sitemap` doğrudan hedef siteden
-çeker. Aynı JSON'u `--budget` (CI kapısı), `psi_report.py` (HTML) ve `psi_diff.py` (iki çalışmayı
-karşılaştırma) tüketir; plan ise Claude + yerleşik `references/` ile yazılır (`claude-seo` kuruluysa ek derinlik).
+`psi_audit.py` ölçümü PSI'den, saha verisini CrUX'tan alır; `--geo`/`--sitemap`/`--from-robots` doğrudan
+hedef siteden çeker. Aynı JSON'u `--budget` (CI kapısı), `psi_plan.py` (deterministik plan), `psi_report.py`
+(HTML) ve `psi_diff.py` (iki çalışmayı karşılaştırma; `--history` ile zaman trendi) tüketir; zengin plan ise
+Claude + yerleşik `references/` ile yazılır (`claude-seo` kuruluysa ek derinlik).
 
 ## PSI ve diğer araçlara göre konum
 
@@ -118,7 +123,8 @@ Sadece skoruna bakacaksan pagespeed.web.dev yeterli. Fark, PSI sayfasının yapm
 
 Üretilen Markdown; özet skorlar, Core Web Vitals, etki×efor öncelikleri, tüm performans bulguları,
 SEO/erişilebilirlik aksiyonları (her biri somut kanıtla), teknolojiye özel notlar ve dağıtım sonrası
-tekrar-test adımını içerir. Örnek: [`references/ornek_plan_iskeleti.md`](references/ornek_plan_iskeleti.md).
+tekrar-test adımını içerir. Aynı iskeleti `psi_plan.py` LLM olmadan, deterministik bir baseline olarak da
+üretir. Örnek: [`references/ornek_plan_iskeleti.md`](references/ornek_plan_iskeleti.md).
 
 ## Yerleşik derinlik
 
