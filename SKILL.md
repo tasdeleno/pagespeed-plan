@@ -62,6 +62,9 @@ durumunu olcmek ve **ne yapilmasi gerektigine dair plan** istediginde.
    - `largestResources`: en agir **tekil** kaynaklar (transferSize'a gore). Tur-toplaminin
      gizledigi sisman tek dosyayi (cogu zaman logo/header ikonu) yuzeye cikarir — bunu daima gozden gecir.
    - `stackPacks`: **teknolojiye ozel oneriler** (WordPress, WooCommerce, React vb.).
+   - `screenshots` (yalniz `--screenshots` ile): kaydedilen ekran goruntusu/filmstrip dosya yollari.
+   - `geo` (yalniz `--geo` ile): robots.txt AI-crawler kurallari + `llms.txt` var/yok.
+   - **Cok-URL modu** (birden cok URL veya `--sitemap`): tum cikti `{"pages": {url: <ustteki bicim>}}` sarilir.
    - `warnings` / `errors`: kismi/tam basarisizlik nedeni.
 4. **SEO / teknik / erisilebilirlik derinligi icin `references/` dosyalarini kullan** (asagidaki
    bolum). claude-seo kuruluysa opsiyonel olarak ek derinlik icin cagir.
@@ -99,6 +102,23 @@ Bu derinlik **`references/` altinda yerlesiktir**; claude-seo olmadan da tam pla
    ustteki derinlige EK olarak entegre et. Kurulu degilse bu adim atlanir (uyari/eksik notu YOK —
    yerlesik referanslar zaten yeterli).
 
+## Ek modlar (CI, coklu sayfa, diff, HTML rapor, GEO)
+Ayni `psi_audit.py` + iki kucuk yardimci betik; hepsi stdlib (pip yok), PSI JSON'una karsi calisir.
+- **Coklu sayfa / sitemap:** `psi_audit.py <url1> <url2> ...` ya da `--sitemap <sitemap.xml> --max-pages N`
+  (varsayilan 10). Cikti `pages` altinda toplanir; kota icin coklu modda `--runs` varsayilani 1.
+- **Ekran goruntusu / filmstrip:** `--screenshots <klasor>` → Lighthouse'un final + filmstrip
+  gorsellerini yazar (ekstra istek YOK). Plana/HTML rapora gorsel kanit ekler.
+- **GEO / llms.txt:** `--geo` → robots.txt'te AI-crawler (GPTBot/ClaudeBot/Google-Extended...) durumu +
+  `llms.txt` varligi. Derinlik: `references/teknik-seo-derin.md` (AI-crawler tablosu).
+- **CI butce kapisi:** `--budget "perf=90,lcp=2500,cls=0.1,seo=90,a11y=90"` → esik ihlalinde exit 1 +
+  BUTCE ozeti (yapiyi kirmizi yapmak icin). Kategori: skor>=esik; metrik: deger<=esik (ms/CLS).
+- **Oncesi/sonrasi diff:** `python3 scripts/psi_diff.py eski.json yeni.json [--fail-on-regression]` →
+  kategori/CWV/denetim deltalari; regresyonda exit 1.
+- **Paylasilabilir HTML rapor:** `python3 scripts/psi_report.py psi_veri.json --out rapor.html` →
+  kendine-yeter (harici istek yok) tek dosya; skor kartlari, CWV, bulgular + `details` kaniti, filmstrip.
+- **Kod-tarafi kontrast:** `python3 scripts/contrast.py "#onrenk" "#arkaplan" [--large] [--behind <zemin>]`
+  → WCAG orani + AA/AAA; AA gecmezse exit 1 (chrome gerekmez).
+
 ## Plan formati (Markdown)
 1. **Ozet** – URL (gerekirse `finalUrl`/redirect notu), test tarihi, strateji(ler),
    kosu sayisi, kategori skor tablosu (mobil vs masaustu) ve `counts` ("PSI'de N bulgu, M duzeltilecek").
@@ -127,6 +147,8 @@ Plani teknik ekibin dogrudan uygulayabilecegi somutlukta yaz: her maddede *ne*, 
   baslik ayari = **dusuk**; kullanilmayan JS/CSS, lazy-load, 3P script erteleme = **orta**;
   sunucu yaniti/TTFB, kritik CSS, mimari/render, font stratejisi = **yuksek**.
 - Ilk 3-5 aksiyon "yuksek etki + dusuk/orta efor".
+- **Spekulatif kovalamama:** dusuk-kazancli bulgularda (`unused-javascript`/`unused-css`) once mevcut
+  durumu dogrula (build'de code-splitting zaten var mi, ana bundle vs ayri chunk) — korlemesine kovalama.
 
 ## Core Web Vitals esikleri (referans)
 - **LCP**: <=2.5 sn iyi, <=4.0 sn gelistirilmeli, >4.0 sn zayif
@@ -144,6 +166,10 @@ Ozet metrikler kok nedeni GIZLEYEBILIR. Skor iyilesmiyorsa veya bir metrik inatc
    `curl -s -o /dev/null -w '%{size_download}' <url>` ile OLC. Header'da eager yuklenen global
    gorseller (logo) LCP gorseliyle bant genisligi yarisir → LCP'yi tikar. Cok siklikla bir gorsel,
    optimizasyon pipeline'i (CDN `f_auto/q_auto`, `<img>` wrapper) DISINDA kalmistir.
+   **CDN transform byte-testi:** ayni gorseli varyantlarda olcup karsilastir —
+   `curl -s -o /dev/null -w '%{size_download} %{content_type}\n'` ile `w_800/q_auto/f_auto`
+   (Cloudinary/imgix/Unsplash) "hangi boyut/format ne kadar" tablosu cikar. **Canlida GERCEKTE inen
+   kaynagi dogrula:** gorsel CMS/DB'den geliyorsa koddaki fallback URL'yi duzeltmek etkisiz kalabilir.
 
 2. **SPA'da gec-LCP.** LCP gorseli JS render + API cagrisi sonrasi indirilmeye baslarsa
    (React/Vue/SPA) `fetchpriority=high` bile gec devreye girer. Cozum: HTML'e sunucu-taraflı
@@ -151,11 +177,17 @@ Ozet metrikler kok nedeni GIZLEYEBILIR. Skor iyilesmiyorsa veya bir metrik inatc
    `<img>`'in gercekte indirdigiyle BIREBIR eslesmeli** (CDN transform + `srcset`/`sizes` dahil),
    yoksa cift indirme olur ve preload bosa gider.
 
-3. **`color-contrast` / cogu a11y denetiminde PSI HANGI element oldugunu SOYLEMEZ.** Kesin node
-   icin canliya karsi tarayici calistir: chrome-devtools `evaluate_script` ile DOM'u gezip WCAG
-   kontrast hesabi yap (**opaklik/rgba blend dahil** — `red-600/40` gibi yari-saydam renkler zemine
-   harmanlanir) veya axe kullan. Boylece hangi `class`/renk duzeltilecek netlesir; korlemesine
-   tema degistirme. Duzeltme sonrasi ayni taramayi tekrarla → 0 ihlal teyidi.
+3. **a11y/`color-contrast`: "hangi element" bilgisi ZATEN PSI `details`'inde — chrome GEREKMEZ.**
+   `extract_details`, `color-contrast`/`image-alt`/`link-name`/`target-size` icin node
+   (selector/snippet) + degerini (oran/boyut) verir. Oncelik sirasi:
+   1) **PSI `details` (birincil)** — hangi element/renk buradan cikar.
+   2) **`curl`** ile canli kaynak/renk dogrulama.
+   3) Kaynaga erisim varsa **`scripts/contrast.py "#onrenk" "#arkaplan"`** ile WCAG orani + AA/AAA;
+      **yari-saydam/rgba** icin `--behind <zemin>` (`red-600/40` gibi renkler zemine harmanlanir).
+      Korlemesine tema degistirme.
+   4) Opsiyonel CLI (kuruluysa, duzeltme sonrasi 0-ihlal teyidi): `npx lighthouse
+      --only-categories=accessibility`, `@axe-core/cli` veya `pa11y` (Chrome ister, MCP degil).
+   chrome-devtools yalnizca kuruluysa opsiyonel bir alternatiftir; **hicbir adim ona bagli degil.**
 
 4. **Retest'ten ONCE degisikligin CANLIDA oldugunu DOGRULA.** `autoDeploy` kapali olabilir,
    manuel deploy gerekebilir, CDN/HTML cache bayat olabilir → yoksa eski surumu olcup "degismedi"
@@ -164,9 +196,16 @@ Ozet metrikler kok nedeni GIZLEYEBILIR. Skor iyilesmiyorsa veya bir metrik inatc
 
 5. **PSI kota (429) yonetimi ve PSI'siz teshis.** Anahtarsiz gunluk limit dusuktur; ayni gun
    birkac tam testte dolar. Doldugunda: `PSI_API_KEY` kullan (yarin sifirlanir), `--runs 1`'e dus,
-   ya da PSI'yi tamamen atla — **chrome-devtools** (network istekleri + lighthouse) ve **`curl` byte
-   olcumu** lab tarafini + kaynak agirligini PSI olmadan da verir. Once/sonra dogrulamasi icin de
+   ya da PSI'yi atla — **`curl` byte olcumu**
+   (`curl -s -o /dev/null -w '%{size_download} %{content_type}'`) kaynak agirligini/formatini,
+   opsiyonel **`npx lighthouse`** (kuruluysa) lab tarafini PSI'siz verir. Once/sonra dogrulamasi icin
    PSI sart degil: ayni `curl` byte olcumunu iki surumde karsilastir.
+   (chrome-devtools kuruluysa network paneli + lighthouse de kullanilabilir — opsiyonel.)
+
+6. **"Deploy sonrasi hicbir sey degismedi" = kok neden YANLIS (iterasyon refleksi).** Degisiklik
+   CANLIDA (bkz. #4) ama metrik OYNAMADIYSA, hipotezin yanlisti → duzeltmeyi geri sorgula ve **baska
+   darbogaz ara** (bizde bu, gizli logo darbogazini yakalatti). Bir bulguyu "duzelttim" sanip gecme;
+   olc, tutmadiysa kok nedeni degistir.
 
 ## Notlar
 - Betik yalnizca okuma yapar; siteyi degistirmez.

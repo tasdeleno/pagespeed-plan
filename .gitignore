@@ -3,3 +3,5 @@
 psi_veri.json
 *.out.json
 *-pagespeed-plani.md
+*.html
+screenshots/

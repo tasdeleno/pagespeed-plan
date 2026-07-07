@@ -426,32 +426,169 @@ def aggregate(runs, strategy):
     }
 
 
-def main():
-    ap = argparse.ArgumentParser(description="PageSpeed Insights denetim araci (tam kapsam)")
-    ap.add_argument("url", help="Test edilecek URL")
-    ap.add_argument("--strategy", choices=["mobile", "desktop", "both"], default="both")
-    ap.add_argument("--runs", type=int, default=3, help="Strateji basina kosu (medyan alinir)")
-    ap.add_argument("--categories", default=",".join(DEFAULT_CATS))
-    ap.add_argument("--locale", default="tr")
-    ap.add_argument("--api-key", default=os.environ.get("PSI_API_KEY"))
-    ap.add_argument("--timeout", type=int, default=90)
-    ap.add_argument("--delay", type=float, default=1.0, help="Kosular arasi bekleme (sn)")
-    ap.add_argument("--out", help="JSON ozeti ek olarak bu dosyaya yaz")
-    args = ap.parse_args()
+def fetch_text(url, timeout=30):
+    """Basit GET -> metin (sitemap, robots.txt, llms.txt icin). Hatayi cagirana birakir."""
+    req = urllib.request.Request(url, headers={"User-Agent": "psi-audit/3.0"})
+    with urllib.request.urlopen(req, timeout=timeout) as r:
+        return r.read().decode("utf-8", "ignore")
 
-    url = args.url
-    if not url.startswith(("http://", "https://")):
-        url = "https://" + url
-    cats = [c.strip() for c in args.categories.split(",") if c.strip()]
-    strategies = ["mobile", "desktop"] if args.strategy == "both" else [args.strategy]
-    runs_n = max(1, args.runs)
 
+def parse_sitemap(xml_text):
+    """sitemap.xml (veya sitemapindex) -> [loc, ...]. Namespace-agnostik. [saf]"""
+    import xml.etree.ElementTree as ET
+    try:
+        root = ET.fromstring(xml_text)
+    except ET.ParseError:
+        return []
+    locs = []
+    for el in root.iter():
+        if el.tag.rsplit("}", 1)[-1] == "loc" and el.text and el.text.strip():
+            locs.append(el.text.strip())
+    return locs
+
+
+def _url_slug(url):
+    net = urllib.parse.urlsplit(url).netloc or url
+    return "".join(c if c.isalnum() else "-" for c in net.lower()).strip("-") or "site"
+
+
+def extract_screenshots(lh, out_dir, prefix=""):
+    """Lighthouse JSON'daki final/full-page/filmstrip base64 gorsellerini out_dir'a yazar.
+    Yazilan dosya yollarini dondurur (PSI kotasindan ekstra istek YOK)."""
+    import base64
+    audits = lh.get("audits", {}) or {}
+    os.makedirs(out_dir, exist_ok=True)
+    saved = []
+
+    def _write(data_uri, name):
+        if not isinstance(data_uri, str) or not data_uri.startswith("data:"):
+            return
+        try:
+            header, b64 = data_uri.split(",", 1)
+        except ValueError:
+            return
+        mime = header[5:].split(";")[0]
+        ext = {"image/jpeg": "jpg", "image/png": "png", "image/webp": "webp"}.get(mime, "img")
+        path = os.path.join(out_dir, f"{name}.{ext}")
+        with open(path, "wb") as f:
+            f.write(base64.b64decode(b64))
+        saved.append(path)
+
+    _write(((audits.get("final-screenshot") or {}).get("details") or {}).get("data"), f"{prefix}final")
+    _write((((audits.get("full-page-screenshot") or {}).get("details") or {}).get("screenshot") or {}).get("data"),
+           f"{prefix}fullpage")
+    thumbs = ((audits.get("screenshot-thumbnails") or {}).get("details") or {}).get("items") or []
+    for i, it in enumerate(thumbs):
+        _write((it or {}).get("data"), f"{prefix}filmstrip-{i:02d}")
+    return saved
+
+
+AI_CRAWLERS = ["GPTBot", "ChatGPT-User", "OAI-SearchBot", "ClaudeBot", "Claude-Web",
+               "PerplexityBot", "Google-Extended", "CCBot", "Bytespider", "Applebot-Extended"]
+
+
+def parse_robots_ai(text):
+    """robots.txt metnini User-agent bloklarina ayirip her AI-crawler icin durum dondurur. [saf]
+    Deger: 'blocked' (Disallow: /), 'allowed' (blok var ama tam engel yok), 'not-mentioned'."""
+    blocks, cur = [], None
+    for raw in text.splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#") or ":" not in line:
+            continue
+        k, v = line.split(":", 1)
+        k, v = k.strip().lower(), v.strip()
+        if k == "user-agent":
+            if cur and cur["seen_rule"]:
+                blocks.append(cur)
+                cur = None
+            if cur is None:
+                cur = {"agents": [], "disallow": [], "seen_rule": False}
+            cur["agents"].append(v)
+        elif k in ("disallow", "allow") and cur is not None:
+            cur["seen_rule"] = True
+            if k == "disallow":
+                cur["disallow"].append(v)
+    if cur:
+        blocks.append(cur)
+    result = {}
+    for token in AI_CRAWLERS:
+        status = "not-mentioned"
+        for b in blocks:
+            if any(a.lower() == token.lower() for a in b["agents"]):
+                status = "blocked" if "/" in b["disallow"] else "allowed"
+                break
+        result[token] = status
+    return result
+
+
+def geo_check(base_url, timeout=20):
+    """origin'in /robots.txt (AI-crawler kurallari) ve /llms.txt varligini raporlar."""
+    parts = urllib.parse.urlsplit(base_url)
+    origin = urllib.parse.urlunsplit((parts.scheme or "https", parts.netloc, "", "", ""))
+    out = {"origin": origin, "robotsTxt": False, "llmsTxt": False, "aiCrawlers": {}}
+    try:
+        out["aiCrawlers"] = parse_robots_ai(fetch_text(origin + "/robots.txt", timeout))
+        out["robotsTxt"] = True
+    except Exception:  # noqa: BLE001
+        pass
+    try:
+        fetch_text(origin + "/llms.txt", timeout)
+        out["llmsTxt"] = True
+    except Exception:  # noqa: BLE001
+        pass
+    return out
+
+
+BUDGET_CATS = {"perf": "performance", "performance": "performance", "seo": "seo",
+               "a11y": "accessibility", "accessibility": "accessibility",
+               "bp": "best-practices", "best-practices": "best-practices"}
+BUDGET_METRICS = {"lcp": "LCP", "fcp": "FCP", "tbt": "TBT", "si": "SpeedIndex",
+                  "tti": "TTI", "cls": "CLS"}
+
+
+def parse_budget(spec):
+    """'perf=90,lcp=2500,cls=0.1' -> {'perf':90.0,...}. [saf]"""
+    out = {}
+    for part in (spec or "").split(","):
+        part = part.strip()
+        if not part or "=" not in part:
+            continue
+        k, v = part.split("=", 1)
+        try:
+            out[k.strip().lower()] = float(v.strip())
+        except ValueError:
+            continue
+    return out
+
+
+def check_budget(results, spec):
+    """results (strateji->aggregate) icin butce ihlallerini dondurur. Kategori: skor>=esik;
+    metrik: deger<=esik. [saf]"""
+    budget = spec if isinstance(spec, dict) else parse_budget(spec)
+    violations = []
+    for strat, res in (results or {}).items():
+        cats = res.get("categories") or {}
+        lab = res.get("labMetrics") or {}
+        for key, limit in budget.items():
+            if key in BUDGET_CATS:
+                score = (cats.get(BUDGET_CATS[key]) or {}).get("score")
+                if score is not None and score < limit:
+                    violations.append({"strategy": strat, "key": key, "got": score, "limit": limit, "type": "min"})
+            elif key in BUDGET_METRICS:
+                val = (lab.get(BUDGET_METRICS[key]) or {}).get("numericValue")
+                if val is not None and val > limit:
+                    violations.append({"strategy": strat, "key": key, "got": round(val), "limit": limit, "type": "max"})
+    return violations
+
+
+def audit_url(url, args, cats, strategies, runs_n):
+    """Tek bir URL'yi denetler ve tek-URL cikti sozlugunu dondurur (back-compat bicim)."""
     out = {"url": url, "locale": args.locale, "runsRequested": runs_n,
            "results": {}, "errors": {}, "warnings": {}}
-
     for s in strategies:
         singles = []
         err = None
+        shots = None
         for i in range(runs_n):
             try:
                 data = fetch(url, s, cats, args.locale, args.api_key, args.timeout)
@@ -459,6 +596,9 @@ def main():
                     err = data["error"].get("message") if isinstance(data["error"], dict) else str(data["error"])
                     break
                 singles.append(run_once(data, s))
+                if args.screenshots and shots is None:
+                    shots = extract_screenshots(data.get("lighthouseResult", {}) or {},
+                                                args.screenshots, prefix=f"{_url_slug(url)}-{s}-")
             except urllib.error.HTTPError as e:
                 body = e.read().decode("utf-8", "ignore")[:400]
                 err = f"HTTP {e.code}: {body}"
@@ -472,19 +612,94 @@ def main():
             if i < runs_n - 1:
                 time.sleep(args.delay)
         if singles:
-            out["results"][s] = aggregate(singles, s)
+            agg = aggregate(singles, s)
+            if shots:
+                agg["screenshots"] = shots
+            out["results"][s] = agg
             if err:
                 out["warnings"][s] = f"{len(singles)}/{runs_n} kosu basarili; son hata: {err}"
         else:
             out["errors"][s] = err or "bilinmeyen hata"
 
-    text = json.dumps(out, ensure_ascii=False, indent=2)
+    if args.geo:
+        base = next((r["finalUrl"] for r in out["results"].values() if r.get("finalUrl")), url)
+        out["geo"] = geo_check(base, args.timeout)
+    return out
+
+
+def _normalize(u):
+    return u if u.startswith(("http://", "https://")) else "https://" + u
+
+
+def main():
+    try:  # Windows konsolu (cp1254 vb.) UTF-8 disi karakterlerde cokmesin
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    except (AttributeError, ValueError):
+        pass
+    ap = argparse.ArgumentParser(description="PageSpeed Insights denetim araci (tam kapsam)")
+    ap.add_argument("url", nargs="*", help="Test edilecek URL(ler)")
+    ap.add_argument("--sitemap", help="sitemap.xml URL'si; icindeki sayfalar taranir")
+    ap.add_argument("--max-pages", type=int, default=10, help="--sitemap icin en fazla sayfa")
+    ap.add_argument("--strategy", choices=["mobile", "desktop", "both"], default="both")
+    ap.add_argument("--runs", type=int, default=None,
+                    help="Strateji basina kosu (medyan). Varsayilan: tek-URL 3, cok-URL 1")
+    ap.add_argument("--categories", default=",".join(DEFAULT_CATS))
+    ap.add_argument("--locale", default="tr")
+    ap.add_argument("--api-key", default=os.environ.get("PSI_API_KEY"))
+    ap.add_argument("--timeout", type=int, default=90)
+    ap.add_argument("--delay", type=float, default=1.0, help="Kosular arasi bekleme (sn)")
+    ap.add_argument("--out", help="JSON ozeti ek olarak bu dosyaya yaz")
+    ap.add_argument("--screenshots", metavar="DIR", help="Ekran goruntusu + filmstrip'i bu klasore yaz")
+    ap.add_argument("--geo", action="store_true", help="robots.txt/llms.txt + AI-crawler kontrolu")
+    ap.add_argument("--budget", help="'perf=90,lcp=2500,cls=0.1,...' esikleri; ihlalde exit 1 (CI)")
+    args = ap.parse_args()
+
+    urls = [_normalize(u) for u in args.url]
+    if args.sitemap:
+        try:
+            locs = parse_sitemap(fetch_text(args.sitemap, args.timeout))[:max(1, args.max_pages)]
+            urls.extend(_normalize(u) for u in locs)
+        except Exception as e:  # noqa: BLE001
+            print(f"sitemap alinamadi: {e}", file=sys.stderr)
+    seen = set()
+    urls = [u for u in urls if not (u in seen or seen.add(u))]
+    if not urls:
+        ap.error("En az bir URL veya --sitemap gerekli")
+
+    multi = len(urls) > 1 or bool(args.sitemap)
+    runs_n = max(1, args.runs if args.runs is not None else (1 if multi else 3))
+    cats = [c.strip() for c in args.categories.split(",") if c.strip()]
+    strategies = ["mobile", "desktop"] if args.strategy == "both" else [args.strategy]
+
+    if multi:
+        top = {"pages": {u: audit_url(u, args, cats, strategies, runs_n) for u in urls},
+               "locale": args.locale, "runsRequested": runs_n}
+        results_list = [(u, p.get("results") or {}) for u, p in top["pages"].items()]
+    else:
+        top = audit_url(urls[0], args, cats, strategies, runs_n)
+        results_list = [(urls[0], top.get("results") or {})]
+
+    text = json.dumps(top, ensure_ascii=False, indent=2)
     if args.out:
         with open(args.out, "w", encoding="utf-8") as f:
             f.write(text)
     print(text)
 
-    if not out["results"]:
+    if args.budget:
+        violations = []
+        for u, res in results_list:
+            for v in check_budget(res, args.budget):
+                v["url"] = u
+                violations.append(v)
+        if violations:
+            lines = ["=== BUTCE IHLALI ==="]
+            for v in violations:
+                lines.append(f"  {v['url']} [{v['strategy']}] {v['key']}={v['got']} "
+                             f"(hedef {'>=' if v['type'] == 'min' else '<='} {v['limit']})")
+            print("\n".join(lines), file=sys.stderr)
+            sys.exit(1)
+
+    if not any(res for _, res in results_list):
         sys.exit(2)
 
 

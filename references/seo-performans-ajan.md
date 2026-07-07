@@ -40,8 +40,9 @@ Metrik eşikleri için `core-web-vitals-derin.md`; bu dosya **yöntem + yaygın 
   Lab teşhis aracıdır; **daima CrUX saha verisiyle doğrula.**
 - **LCP alt-parçaları** (TTFB, load delay, load duration, render delay) CrUX'ta mevcut → hangi
   parçanın büyük olduğunu bul, düzeltmeyi ona göre seç (`core-web-vitals-derin.md`).
-- Kota/PSI'siz teşhis: `chrome-devtools` (network + lighthouse) ve `curl` byte ölçümü lab tarafını
-  PSI olmadan da verir (SKILL.md "Derin teşhis #5").
+- Kota/PSI'siz teşhis (chrome GEREKMEZ): **`curl` byte/format ölçümü** kaynak ağırlığını, opsiyonel
+  **`npx lighthouse`** (kuruluysa) lab tarafını PSI olmadan da verir. chrome-devtools yalnızca
+  kuruluysa opsiyonel alternatiftir (SKILL.md "Derin teşhis #5").
 
 ## Çıktı (plana ne yazılır)
 - Performans skoru (0-100).

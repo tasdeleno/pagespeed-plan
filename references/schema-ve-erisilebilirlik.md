@@ -79,11 +79,13 @@ olduğunu verir — planda o elementi ve değeri **somut** yaz.
 | `aria-*` | ARIA rol/özellik geçerliliği | ilgili elementte ARIA'yı düzelt |
 | `document-title`, `html-has-lang` | Sayfa başlığı, `<html lang>` | ekle/düzelt |
 
-### Kontrast düzeltirken (kritik)
-PSI/Lighthouse **hangi renk** olduğunu `details` node'uyla verir ama **opaklık/rgba harmanını**
-hesaba katmadan körlemesine tema değiştirme. Yarı saydam renkler (ör. `red-600/40`) zemine
-harmanlanır → gerçek kontrastı hesapla (chrome-devtools `evaluate_script` ile DOM'u gez veya axe).
-Düzeltme sonrası aynı taramayı tekrarla → 0 ihlal teyidi.
+### Kontrast düzeltirken (kritik) — chrome GEREKMEZ
+PSI/Lighthouse **hangi renk/element** olduğunu `details` node'uyla verir (`extract_details` çıkarır) →
+kaynağı bulmak için tarayıcıya gerek yok. Öncelik: (1) PSI `details`; (2) kaynağa erişim varsa
+**`scripts/contrast.py "#önrenk" "#arkaplan"`** ile WCAG oranı — **opaklık/rgba harmanı** için
+`--behind <zemin>` (yarı saydam `red-600/40` gibi renkler zemine harmanlanır); körlemesine tema
+değiştirme. (3) Opsiyonel `@axe-core/cli`/`pa11y`/`npx lighthouse` (kuruluysa) ile düzeltme sonrası
+0-ihlal teyidi. chrome-devtools yalnızca kuruluysa opsiyoneldir.
 
 ### Agent-friendly (ileriye dönük, fırsat olarak)
 AI ajanları siteyi erişilebilirlik ağacından okur (en temiz sinyal). Semantik HTML (gerçek
