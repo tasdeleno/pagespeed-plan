@@ -2,8 +2,10 @@
 """psi_audit / psi_diff / contrast oz-kontrolu (stdlib, framework yok).
 Calistir: python3 scripts/test_psi_audit.py  -> hata yoksa 'OK' basar."""
 from psi_audit import (extract_details, _detail_value, parse_sitemap,
-                       parse_budget, check_budget, parse_robots_ai)
-from psi_diff import diff_results
+                       parse_budget, check_budget, parse_robots_ai,
+                       sitemaps_from_robots, history_record)
+from psi_diff import diff_results, trend_table
+from psi_plan import render_plan, _effort, _impact
 from contrast import contrast_ratio, wcag_pass
 
 
@@ -80,6 +82,45 @@ def test_diff_results():
     assert d["regressed"] is True
     audits = d["strategies"]["mobile"]["audits"]
     assert "x" in audits["regressed"] and "y" in audits["fixed"]
+
+
+def test_sitemaps_from_robots():
+    txt = "User-agent: *\nDisallow: /x\nSitemap: https://a.com/sitemap.xml\nsitemap:https://a.com/news.xml\n"
+    assert sitemaps_from_robots(txt) == ["https://a.com/sitemap.xml", "https://a.com/news.xml"]
+    assert sitemaps_from_robots("") == []
+
+
+def test_history_record():
+    results = {"mobile": {"categories": {"performance": {"score": 80}, "seo": {"score": 95}},
+                          "labMetrics": {"LCP": {"numericValue": 3000}, "CLS": {"numericValue": 0.05}}}}
+    rec = history_record("https://a.com", results, "2026-07-07T00:00:00Z")
+    assert rec["url"] == "https://a.com" and rec["ts"] == "2026-07-07T00:00:00Z"
+    m = rec["strategies"]["mobile"]
+    assert m["scores"]["performance"] == 80 and m["scores"]["seo"] == 95
+    assert m["cwv"]["LCP"] == 3000 and m["scores"]["accessibility"] is None
+
+
+def test_trend_table():
+    recs = [history_record("https://a.com", {"mobile": {"categories": {"performance": {"score": 70}},
+                           "labMetrics": {"LCP": {"numericValue": 4200}}}}, "2026-07-07T00:00:00Z")]
+    md = trend_table(recs)
+    assert "| 2026-07-07T00:00:00Z |" in md and "| mobile |" in md and "4200" in md
+
+
+def test_render_plan():
+    obj = {"url": "https://a.com", "results": {"mobile": {
+        "lighthouseVersion": "12.0", "categories": {"performance": {"score": 60}},
+        "labMetrics": {"LCP": {"display": "3,2 s"}},
+        "counts": {"performance": {"duzeltilecek": 1}},
+        "opportunities": [{"id": "unused-javascript", "title": "Kullanılmayan JS", "savingsMs": 800}],
+        "auditsByCategory": {"performance": [
+            {"id": "unused-javascript", "title": "Kullanılmayan JS", "passed": False,
+             "description": "JS'i böl.", "savingsMs": 800}]}}}}
+    md = render_plan(obj)
+    assert "# PageSpeed İyileştirme Planı — https://a.com" in md
+    assert "unused-javascript" in md and "Kullanılmayan JS" in md
+    assert _impact(800) == "Yüksek" and _effort("unused-javascript") == "Orta"
+    assert _effort("color-contrast") == "Düşük"
 
 
 def test_contrast():

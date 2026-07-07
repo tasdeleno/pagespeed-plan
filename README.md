@@ -71,8 +71,9 @@ Tüm bayraklar ve `psi_diff`/`contrast` için [Modlar ve betikler](#modlar-ve-be
 
 | Betik | İş |
 |---|---|
-| `scripts/psi_audit.py` | Denetim + JSON. Tek/çoklu URL, `--sitemap`, `--screenshots`, `--geo`, `--budget` |
-| `scripts/psi_diff.py` | İki denetimi karşılaştırır; `--fail-on-regression` ile CI kapısı |
+| `scripts/psi_audit.py` | Denetim + JSON. Tek/çoklu URL, `--sitemap`, `--from-robots`, `--screenshots`, `--geo`, `--budget`, `--history` |
+| `scripts/psi_plan.py` | JSON'dan LLM'siz, deterministik Markdown planı üretir (özet/CWV/öncelik/kanıt) |
+| `scripts/psi_diff.py` | İki denetimi karşılaştırır (`--fail-on-regression`); `--trend history.jsonl` ile zaman trendi |
 | `scripts/psi_report.py` | JSON'u kendine-yeter tek-dosya HTML rapora çevirir |
 | `scripts/contrast.py` | Kod-tarafı WCAG kontrast oranı; AA geçmezse exit 1 (tarayıcı gerekmez) |
 

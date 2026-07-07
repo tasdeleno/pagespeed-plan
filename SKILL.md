@@ -106,6 +106,8 @@ Bu derinlik **`references/` altinda yerlesiktir**; claude-seo olmadan da tam pla
 Ayni `psi_audit.py` + iki kucuk yardimci betik; hepsi stdlib (pip yok), PSI JSON'una karsi calisir.
 - **Coklu sayfa / sitemap:** `psi_audit.py <url1> <url2> ...` ya da `--sitemap <sitemap.xml> --max-pages N`
   (varsayilan 10). Cikti `pages` altinda toplanir; kota icin coklu modda `--runs` varsayilani 1.
+- **robots.txt -> sitemap otomatik kesif:** `--from-robots <site-url>` → sitenin `/robots.txt`'indeki
+  `Sitemap:` satirlarini bulur, yoksa `/sitemap.xml`'e duser; bulunan sayfalari `--max-pages` ile tarar.
 - **Ekran goruntusu / filmstrip:** `--screenshots <klasor>` → Lighthouse'un final + filmstrip
   gorsellerini yazar (ekstra istek YOK). Plana/HTML rapora gorsel kanit ekler.
 - **GEO / llms.txt:** `--geo` → robots.txt'te AI-crawler (GPTBot/ClaudeBot/Google-Extended...) durumu +
@@ -114,6 +116,11 @@ Ayni `psi_audit.py` + iki kucuk yardimci betik; hepsi stdlib (pip yok), PSI JSON
   BUTCE ozeti (yapiyi kirmizi yapmak icin). Kategori: skor>=esik; metrik: deger<=esik (ms/CLS).
 - **Oncesi/sonrasi diff:** `python3 scripts/psi_diff.py eski.json yeni.json [--fail-on-regression]` →
   kategori/CWV/denetim deltalari; regresyonda exit 1.
+- **Trend gecmisi:** `--history <dosya.jsonl>` → her kosuyu kompakt bir JSONL kaydina ekler (skor + CWV).
+  `python3 scripts/psi_diff.py --trend <dosya.jsonl>` → zaman-sirali skor/CWV trend tablosu (Markdown).
+- **Deterministik plan (LLM'siz):** `python3 scripts/psi_plan.py psi_veri.json --out plan.md` →
+  JSON'dan bu SKILL'in plan iskeletini (ozet/CWV/oncelik/bulgu+kanit) kod ile uretir. Claude'un yazdigi
+  zengin plana bir baseline/alternatiftir; ag yok.
 - **Paylasilabilir HTML rapor:** `python3 scripts/psi_report.py psi_veri.json --out rapor.html` →
   kendine-yeter (harici istek yok) tek dosya; skor kartlari, CWV, bulgular + `details` kaniti, filmstrip.
 - **Kod-tarafi kontrast:** `python3 scripts/contrast.py "#onrenk" "#arkaplan" [--large] [--behind <zemin>]`

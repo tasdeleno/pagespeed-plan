@@ -71,8 +71,9 @@ For every flag plus `psi_diff`/`contrast`, see [Modes and scripts](#modes-and-sc
 
 | Script | Job |
 |---|---|
-| `scripts/psi_audit.py` | Audit + JSON. Single/multi URL, `--sitemap`, `--screenshots`, `--geo`, `--budget` |
-| `scripts/psi_diff.py` | Compares two audits; `--fail-on-regression` as a CI gate |
+| `scripts/psi_audit.py` | Audit + JSON. Single/multi URL, `--sitemap`, `--from-robots`, `--screenshots`, `--geo`, `--budget`, `--history` |
+| `scripts/psi_plan.py` | Renders the JSON into a deterministic Markdown plan, no LLM (summary/CWV/priorities/evidence) |
+| `scripts/psi_diff.py` | Compares two audits (`--fail-on-regression`); `--trend history.jsonl` for a score trend over time |
 | `scripts/psi_report.py` | Renders the JSON into a self-contained single-file HTML report |
 | `scripts/contrast.py` | Code-side WCAG contrast ratio; exits 1 if AA fails (no browser needed) |
 

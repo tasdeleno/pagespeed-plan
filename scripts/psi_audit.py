@@ -539,6 +539,32 @@ def geo_check(base_url, timeout=20):
     return out
 
 
+def sitemaps_from_robots(text):
+    """robots.txt icindeki 'Sitemap: <url>' satirlarini dondurur. [saf]"""
+    out = []
+    for line in (text or "").splitlines():
+        line = line.strip()
+        if line.lower().startswith("sitemap:"):
+            u = line.split(":", 1)[1].strip()
+            if u:
+                out.append(u)
+    return out
+
+
+def history_record(url, results, ts):
+    """Bir kosuyu trend icin kompakt bir kayda indirger (JSONL satiri). [saf]"""
+    rec = {"ts": ts, "url": url, "strategies": {}}
+    for s, res in (results or {}).items():
+        cats = res.get("categories") or {}
+        lab = res.get("labMetrics") or {}
+        rec["strategies"][s] = {
+            "scores": {c: (cats.get(c) or {}).get("score")
+                       for c in ("performance", "accessibility", "best-practices", "seo")},
+            "cwv": {m: (lab.get(m) or {}).get("numericValue") for m in ("LCP", "TBT", "CLS")},
+        }
+    return rec
+
+
 BUDGET_CATS = {"perf": "performance", "performance": "performance", "seo": "seo",
                "a11y": "accessibility", "accessibility": "accessibility",
                "bp": "best-practices", "best-practices": "best-practices"}
@@ -652,9 +678,24 @@ def main():
     ap.add_argument("--screenshots", metavar="DIR", help="Ekran goruntusu + filmstrip'i bu klasore yaz")
     ap.add_argument("--geo", action="store_true", help="robots.txt/llms.txt + AI-crawler kontrolu")
     ap.add_argument("--budget", help="'perf=90,lcp=2500,cls=0.1,...' esikleri; ihlalde exit 1 (CI)")
+    ap.add_argument("--history", metavar="FILE", help="Her kosuyu bu JSONL'e ekle (trend icin)")
+    ap.add_argument("--from-robots", metavar="URL", help="Sitenin robots.txt'inden sitemap'leri kesfedip tara")
     args = ap.parse_args()
 
     urls = [_normalize(u) for u in args.url]
+    if args.from_robots:
+        p = urllib.parse.urlsplit(_normalize(args.from_robots))
+        origin = urllib.parse.urlunsplit((p.scheme or "https", p.netloc, "", "", ""))
+        try:
+            sms = sitemaps_from_robots(fetch_text(origin + "/robots.txt", args.timeout)) or [origin + "/sitemap.xml"]
+        except Exception as e:  # noqa: BLE001
+            print(f"robots.txt alinamadi: {e}", file=sys.stderr)
+            sms = [origin + "/sitemap.xml"]
+        for sm in sms:
+            try:
+                urls.extend(_normalize(u) for u in parse_sitemap(fetch_text(sm, args.timeout))[:max(1, args.max_pages)])
+            except Exception as e:  # noqa: BLE001
+                print(f"sitemap alinamadi ({sm}): {e}", file=sys.stderr)
     if args.sitemap:
         try:
             locs = parse_sitemap(fetch_text(args.sitemap, args.timeout))[:max(1, args.max_pages)]
@@ -666,7 +707,7 @@ def main():
     if not urls:
         ap.error("En az bir URL veya --sitemap gerekli")
 
-    multi = len(urls) > 1 or bool(args.sitemap)
+    multi = len(urls) > 1 or bool(args.sitemap) or bool(args.from_robots)
     runs_n = max(1, args.runs if args.runs is not None else (1 if multi else 3))
     cats = [c.strip() for c in args.categories.split(",") if c.strip()]
     strategies = ["mobile", "desktop"] if args.strategy == "both" else [args.strategy]
@@ -684,6 +725,13 @@ def main():
         with open(args.out, "w", encoding="utf-8") as f:
             f.write(text)
     print(text)
+
+    if args.history:
+        ts = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+        with open(args.history, "a", encoding="utf-8") as hf:
+            for u, res in results_list:
+                if res:
+                    hf.write(json.dumps(history_record(u, res, ts), ensure_ascii=False) + "\n")
 
     if args.budget:
         violations = []

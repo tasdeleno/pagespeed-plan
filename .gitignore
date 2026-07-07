@@ -5,3 +5,5 @@ psi_veri.json
 *-pagespeed-plani.md
 *.html
 screenshots/
+history.jsonl
+*.history.jsonl

@@ -4,8 +4,9 @@
 Kullanim:
   python3 psi_diff.py eski.json yeni.json
   python3 psi_diff.py eski.json yeni.json --fail-on-regression   # CI: regresyonda exit 1
+  python3 psi_diff.py --trend history.jsonl                      # zaman icinde skor trendi
 
-Ag yok; yalnizca iki yerel JSON okunur. Cok-URL (`pages`) JSON'da ilk sayfa alinir.
+Ag yok; yalnizca yerel JSON/JSONL okunur. Cok-URL (`pages`) JSON'da ilk sayfa alinir.
 """
 import argparse
 import json
@@ -100,17 +101,64 @@ def to_markdown(diff, old_name, new_name):
     return "\n".join(L)
 
 
+def load_history(path):
+    """history.jsonl -> [record, ...] (bozuk satirlari atlar). [saf-yakin: sadece dosya okur]"""
+    records = []
+    with open(path, encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                records.append(json.loads(line))
+            except json.JSONDecodeError:
+                continue
+    return records
+
+
+def _ms(v):
+    return round(v) if isinstance(v, (int, float)) else "—"
+
+
+def trend_table(records):
+    """history kayitlarini zaman-sirali Markdown trend tablosuna cevirir. [saf]"""
+    L = [f"# PageSpeed trend — {len(records)} kayit", ""]
+    L += ["| Zaman | URL | Strateji | Perf | A11y | BP | SEO | LCP | CLS |",
+          "|---|---|---|---|---|---|---|---|---|"]
+    for rec in records:
+        ts = rec.get("ts", "—")
+        url = rec.get("url", "—")
+        for s, sd in (rec.get("strategies") or {}).items():
+            sc = sd.get("scores") or {}
+            cwv = sd.get("cwv") or {}
+            L.append(f"| {ts} | {url} | {s} | {sc.get('performance')} | {sc.get('accessibility')} | "
+                     f"{sc.get('best-practices')} | {sc.get('seo')} | {_ms(cwv.get('LCP'))} | {cwv.get('CLS')} |")
+    return "\n".join(L)
+
+
 def main():
     try:  # Windows konsolu (cp1254 vb.) UTF-8 disi karakterlerde cokmesin
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     except (AttributeError, ValueError):
         pass
     ap = argparse.ArgumentParser(description="psi_audit JSON'larini karsilastir (oncesi -> sonrasi)")
-    ap.add_argument("old", help="Onceki psi_audit JSON")
-    ap.add_argument("new", help="Sonraki psi_audit JSON")
+    ap.add_argument("old", nargs="?", help="Onceki psi_audit JSON")
+    ap.add_argument("new", nargs="?", help="Sonraki psi_audit JSON")
+    ap.add_argument("--trend", metavar="FILE", help="history.jsonl'i zaman-sirali trend tablosuna cevir")
     ap.add_argument("--fail-on-regression", action="store_true", help="Regresyonda exit 1 (CI)")
     ap.add_argument("--out", help="Markdown ciktisini bu dosyaya da yaz")
     args = ap.parse_args()
+
+    if args.trend:
+        md = trend_table(load_history(args.trend))
+        if args.out:
+            with open(args.out, "w", encoding="utf-8") as f:
+                f.write(md)
+        print(md)
+        return
+
+    if not (args.old and args.new):
+        ap.error("iki JSON (old new) veya --trend FILE gerekli")
 
     with open(args.old, encoding="utf-8") as f:
         old = json.load(f)
