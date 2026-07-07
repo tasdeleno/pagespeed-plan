@@ -80,16 +80,23 @@ For every flag plus `psi_diff`/`contrast`, see [Modes and scripts](#modes-and-sc
 
 ```mermaid
 flowchart LR
-    U([URL · URLs · sitemap]) --> S["psi_audit.py<br/>stdlib · median-of-N · mobile+desktop"]
-    S -->|PSI v5| G[("Google PSI /<br/>Lighthouse + CrUX")]
-    S -.->|--budget exceeded| GATE{{"CI gate · exit 1"}}
-    G --> J[("JSON<br/>scores · CWV · details · screenshots · geo · pages")]
-    J --> M{{"Claude + references/<br/>prioritized plan .md"}}
-    J --> D["psi_diff.py"]
-    J --> H["psi_report.py"]
+    U([URL · URLs]) --> S["psi_audit.py<br/>stdlib · median-of-N · mobile+desktop"]
+    SM([sitemap.xml]) -.->|parse_sitemap| S
+    S -->|PSI v5 runPagespeed| G[("Google PSI<br/>Lighthouse + CrUX")]
+    S -.->|--geo| W[("target site<br/>robots.txt · llms.txt")]
+    G --> J[("psi JSON<br/>scores · CWV · auditsByCategory + details<br/>opportunities · screenshots · geo · pages")]
+    W -.-> J
+    J -->|--budget exceeded| X{{"exit 1 · CI gate"}}
+    J --> M["Claude + references/<br/>prioritized plan .md"]
+    O[["claude-seo · optional"]] -.-> M
+    J --> R["psi_report.py<br/>self-contained HTML"]
+    P([previous JSON]) --> D["psi_diff.py<br/>before → after · exit 1 on regression"]
+    J --> D
 ```
 
-Measurement comes from the script, depth from the built-in `references/`; Claude merges both into one plan.
+`psi_audit.py` gets lab data from PSI and field data from CrUX; `--geo`/`--sitemap` are fetched directly
+from the target site. The same JSON feeds `--budget` (CI gate), `psi_report.py` (HTML) and `psi_diff.py`
+(comparing two runs); the plan is written by Claude + the built-in `references/` (with `claude-seo` adding depth if installed).
 
 ## Where it fits vs other tools
 

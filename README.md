@@ -80,16 +80,23 @@ Tüm bayraklar ve `psi_diff`/`contrast` için [Modlar ve betikler](#modlar-ve-be
 
 ```mermaid
 flowchart LR
-    U([URL · URL'ler · sitemap]) --> S["psi_audit.py<br/>stdlib · medyan-of-N · mobil+masaüstü"]
-    S -->|PSI v5| G[("Google PSI /<br/>Lighthouse + CrUX")]
-    S -.->|--budget aşıldı| GATE{{"CI kapısı · exit 1"}}
-    G --> J[("JSON<br/>skorlar · CWV · details · screenshots · geo · pages")]
-    J --> M{{"Claude + references/<br/>önceliklendirilmiş plan .md"}}
-    J --> D["psi_diff.py"]
-    J --> H["psi_report.py"]
+    U([URL · URL'ler]) --> S["psi_audit.py<br/>stdlib · medyan-of-N · mobil+masaüstü"]
+    SM([sitemap.xml]) -.->|parse_sitemap| S
+    S -->|PSI v5 runPagespeed| G[("Google PSI<br/>Lighthouse + CrUX")]
+    S -.->|--geo| W[("hedef site<br/>robots.txt · llms.txt")]
+    G --> J[("psi JSON<br/>skorlar · CWV · auditsByCategory + details<br/>opportunities · screenshots · geo · pages")]
+    W -.-> J
+    J -->|--budget ihlali| X{{"exit 1 · CI kapısı"}}
+    J --> M["Claude + references/<br/>önceliklendirilmiş plan .md"]
+    O[["claude-seo · opsiyonel"]] -.-> M
+    J --> R["psi_report.py<br/>kendine-yeter HTML"]
+    P([önceki JSON]) --> D["psi_diff.py<br/>öncesi → sonrası · regresyonda exit 1"]
+    J --> D
 ```
 
-Ölçüm betikten, derinlik yerleşik `references/`'tan gelir; Claude ikisini tek plana birleştirir.
+`psi_audit.py` ölçümü PSI'den, saha verisini CrUX'tan alır; `--geo`/`--sitemap` doğrudan hedef siteden
+çeker. Aynı JSON'u `--budget` (CI kapısı), `psi_report.py` (HTML) ve `psi_diff.py` (iki çalışmayı
+karşılaştırma) tüketir; plan ise Claude + yerleşik `references/` ile yazılır (`claude-seo` kuruluysa ek derinlik).
 
 ## PSI ve diğer araçlara göre konum
 
