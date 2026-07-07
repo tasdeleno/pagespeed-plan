@@ -1,67 +1,48 @@
 <p align="center">
-  <img src="assets/banner.png" alt="pagespeed-plan — PageSpeed Insights denetim + iyileştirme planı" width="100%">
+  <img src="assets/banner.png" alt="pagespeed-plan" width="100%">
 </p>
 
 <h1 align="center">pagespeed-plan</h1>
 
 <p align="center">
-  <b>PageSpeed Insights'ı bir <i>skora bakma aracı</i> olmaktan çıkarır;
-  önceliklendirilmiş, kanıtlı ve <i>uygulanabilir</i> bir iyileştirme planına çevirir.</b><br>
-  <sub>Tek URL · çoklu sayfa/sitemap · CI bütçe kapısı · öncesi/sonrası diff · paylaşılabilir HTML rapor — hepsi <b>sıfır bağımlılıkla</b>.</sub>
+  PageSpeed Insights denetimlerini önceliklendirilmiş, kanıtlı ve uygulanabilir bir
+  iyileştirme planına çeviren, bağımlılıksız bir Claude skill'i.
 </p>
 
 <p align="center">
   <img alt="Python 3" src="https://img.shields.io/badge/Python-3-blue">
-  <img alt="pip yok" src="https://img.shields.io/badge/deps-stdlib%20only-brightgreen">
-  <img alt="CI-ready" src="https://img.shields.io/badge/CI-ready-success">
-  <img alt="Core Web Vitals" src="https://img.shields.io/badge/Core%20Web%20Vitals-LCP·INP·CLS-0cce6b">
-  <img alt="Lisans MIT" src="https://img.shields.io/badge/license-MIT-black">
-  <img alt="Claude Skill" src="https://img.shields.io/badge/Claude-Skill-8A63D2">
+  <img alt="stdlib only" src="https://img.shields.io/badge/deps-stdlib%20only-brightgreen">
+  <img alt="CI ready" src="https://img.shields.io/badge/CI-ready-success">
+  <img alt="MIT" src="https://img.shields.io/badge/license-MIT-black">
 </p>
 
----
+PageSpeed Insights sana skoru ve önerileri verir. `pagespeed-plan` bunları CI'de kırılabilen bir
+bütçe kapısına, dağıtım öncesi/sonrası bir diff'e, sitemap taramasına, paylaşılabilir bir rapora ve
+bir ajanın okuyup uygulayabileceği önceliklendirilmiş bir plana çevirir — Node/Chrome ya da
+`pip install` olmadan, saf Python ile.
 
-## Neden bu var?
+## İçindekiler
 
-Skorunu ve önerilerini görmek için zaten [pagespeed.web.dev](https://pagespeed.web.dev) ücretsiz ve
-harika. **Ama** o sana; regresyonu yakalayan bir **CI kapısı**, bir dağıtım öncesi/sonrası **diff**,
-tüm siteyi tarayan **sitemap** modu, paylaşılabilir tek-dosya **rapor** ya da bir ajanın *okuyup
-uygulayabileceği* **önceliklendirilmiş plan** vermez. `pagespeed-plan` tam da bu boşluğu doldurur —
-ve tüm bunları **Node/Chrome kurmadan, `pip install` olmadan**, saf Python ile yapar.
+- [Ne yapar](#ne-yapar)
+- [Kurulum](#kurulum)
+- [Kullanım](#kullanım)
+- [Modlar ve betikler](#modlar-ve-betikler)
+- [Nasıl çalışır](#nasıl-çalışır)
+- [PSI ve diğer araçlara göre konum](#psi-ve-diğer-araçlara-göre-konum)
+- [Plan çıktısı](#plan-çıktısı)
+- [Yerleşik derinlik](#yerleşik-derinlik)
+- [Roadmap](#roadmap)
+- [Lisans ve atıf](#lisans-ve-atıf)
 
-> **Öneri olmadan bulgu yazmaz.** "Kontrast kötü" demekle kalmaz; *"`button.cta` 2,1:1 → hedef 4,5:1"*
-> gibi **hangi elementin, ne kadar, hedefin ne** olduğunu söyler — insan da ajan da doğrudan uygular.
+## Ne yapar
 
-## Öne çıkanlar
+Bir URL'yi PageSpeed Insights v5 (Lighthouse) ile test eder ve görünen her denetimi — fırsatlar,
+tanılar, Insights, teknolojiye özel öneriler, Core Web Vitals (lab + CrUX) — çıkarır. Her bulguya
+düzeltme önerisini (`description`) ve somut kanıtını (`details`: hangi element, hangi değer → hedef)
+ekler. Örneğin *"kontrast kötü"* demez; *"`button.cta` 2,1:1 → hedef 4,5:1"* der. Çıktı, etki × efor
+sırasına dizilmiş tek bir Markdown planıdır.
 
-- 🎯 **Tam kapsam + somut kanıt** — PSI'de görünen her denetim + `details` (hangi element/değer → hedef): kontrast, dokunma hedefi (buton boyutu), `alt`, `link-name`…
-- 🧭 **Önceliklendirilmiş plan** — etki × efor matrisi, `TAMLIK KURALI`, ajan-eyleme dönük Markdown.
-- 🚦 **CI bütçe kapısı** — `--budget` eşiği aşılınca **exit 1**; yapıyı kırmızı yap, regresyonu üretime bırakma.
-- 🔀 **Öncesi/sonrası diff** — `psi_diff.py` ile skor/CWV/denetim deltaları; regresyonda exit 1.
-- 🕸️ **Çoklu sayfa / sitemap** — bir URL değil, tüm siteyi tara (`--sitemap`).
-- 🖼️ **Görsel** — Lighthouse filmstrip + ekran görüntüsü çıkarımı; **kendine-yeter HTML rapor**.
-- 🤖 **GEO / llms.txt** — AI-crawler (GPTBot/ClaudeBot/Google-Extended…) + `llms.txt` kontrolü.
-- 📊 **Core Web Vitals** — LCP alt-parçaları, INP/CLS kırılımı, lab ↔ saha (CrUX) farkı.
-- 🧩 **Yerleşik derinlik** — SEO/teknik/erişilebilirlik `references/`'ta; **`claude-seo` gerekmez**.
-- 🪶 **Sıfır bağımlılık** — yalnızca Python 3 stdlib. Node yok, Chrome yok, `pip install` yok.
-
-## PSI'yi neye çevirir? (konumlama)
-
-| İhtiyaç | pagespeed.web.dev | Lighthouse CI | Unlighthouse | **pagespeed-plan** |
-|---|:---:|:---:|:---:|:---:|
-| Ölçüm (Lighthouse/PSI) | ✅ | ✅ | ✅ | ✅ |
-| Önceliklendirilmiş **plan** (etki×efor) | ➖ ham liste | ➖ | ➖ | ✅ |
-| Somut kanıt (element/değer) | ✅ (UI) | ➖ | kısmi | ✅ (metin — **ajan okur**) |
-| CI bütçe kapısı (exit-code) | ❌ | ✅ | ✅ | ✅ |
-| Öncesi/sonrası **diff** | ❌ | ✅ | kısmi | ✅ |
-| Çoklu sayfa / sitemap | ❌ | ✅ | ✅ | ✅ |
-| Paylaşılabilir HTML rapor | ✅ (kendi UI) | sunucu | ✅ | ✅ (**tek dosya**) |
-| GEO / llms.txt | ❌ | ❌ | ❌ | ✅ |
-| Kurulum yükü | — | Node | Node+Chrome | **sıfır-pip** |
-| Ajan **okuyup düzeltir** | ❌ | ❌ | ❌ | ✅ |
-
-> Dürüstçe: sadece skoruna bakacaksan pagespeed.web.dev yeter. `pagespeed-plan`, PSI'yi bir **workflow +
-> CI + ajan** katmanına çevirir — asıl kazanç orada.
+Ölçüm yalnızca Python standart kütüphanesiyle yapılır; siteyi değiştirmez, yalnızca okur.
 
 ## Kurulum
 
@@ -69,113 +50,104 @@ ve tüm bunları **Node/Chrome kurmadan, `pip install` olmadan**, saf Python ile
 git clone https://github.com/tasdeleno/pagespeed-plan.git ~/.claude/skills/pagespeed-plan
 ```
 
-Claude içinde `pagespeed-plan` skill'i otomatik keşfedilir. Betikleri bağımsız da çalıştırabilirsin.
-Opsiyonel `PSI_API_KEY` (anahtarsız da çalışır, ama Google kota uygular): Google Cloud Console →
-"PageSpeed Insights API" → Credentials → API key.
+Claude içinde skill otomatik keşfedilir; betikler bağımsız da çalışır. Opsiyonel `PSI_API_KEY`
+anahtarsız çalışmayı kota sınırına takılmadan hızlandırır (Google Cloud Console → PageSpeed Insights API).
 
-## Hızlı başlangıç
+## Kullanım
+
+Claude'a *"şu sitenin PageSpeed testini yap"* demen yeterli. Doğrudan komut satırından:
 
 ```bash
-# 1) Tek URL — tam denetim (mobil+masaüstü, medyan-of-3)
+# Tek URL — tam denetim
 python3 scripts/psi_audit.py https://ornek.com --strategy both --runs 3 --out psi.json
 
-# 2) Tüm site — sitemap taraması
+# Tüm site — sitemap taraması
 python3 scripts/psi_audit.py --sitemap https://ornek.com/sitemap.xml --max-pages 20 --out site.json
 
-# 3) Görsel kanıt — filmstrip + ekran görüntüsü + GEO
+# Görsel kanıt + GEO
 python3 scripts/psi_audit.py https://ornek.com --screenshots ./sc --geo --out psi.json
 
-# 4) CI bütçe kapısı — eşik aşılırsa exit 1
-python3 scripts/psi_audit.py https://ornek.com --strategy mobile --runs 1 \
-  --budget "perf=90,lcp=2500,cls=0.1,seo=90"
+# CI bütçe kapısı — eşik aşılırsa exit 1
+python3 scripts/psi_audit.py https://ornek.com --budget "perf=90,lcp=2500,cls=0.1"
 
-# 5) Öncesi/sonrası diff (regresyonda exit 1)
+# Öncesi/sonrası diff — regresyonda exit 1
 python3 scripts/psi_diff.py onceki.json sonraki.json --fail-on-regression
 
-# 6) Paylaşılabilir tek-dosya HTML rapor
+# Paylaşılabilir HTML rapor
 python3 scripts/psi_report.py psi.json --out rapor.html
-
-# 7) Kod-tarafı WCAG kontrast (chrome gerekmez)
-python3 scripts/contrast.py "#777" "#fff" --large
 ```
 
-**GitHub Actions** — her PR'da performansı koru:
+GitHub Actions'ta her PR'da performansı korumak için:
 
 ```yaml
 - name: PageSpeed bütçe kapısı
   env: { PSI_API_KEY: ${{ secrets.PSI_API_KEY }} }
-  run: |
-    python3 scripts/psi_audit.py https://siten.com --strategy mobile --runs 1 \
-      --budget "perf=90,lcp=2500,cls=0.1" --out psi.json
+  run: python3 scripts/psi_audit.py https://siten.com --runs 1 --budget "perf=90,lcp=2500"
 ```
 
-Claude ile: *"şu sitenin PageSpeed testini yap"* / *"Core Web Vitals planı hazırla"* demen yeterli.
+## Modlar ve betikler
 
-## Nasıl çalışır?
+| Betik | İş |
+|---|---|
+| `scripts/psi_audit.py` | Denetim + JSON. Tek/çoklu URL, `--sitemap`, `--screenshots`, `--geo`, `--budget` |
+| `scripts/psi_diff.py` | İki denetimi karşılaştırır; `--fail-on-regression` ile CI kapısı |
+| `scripts/psi_report.py` | JSON'u kendine-yeter tek-dosya HTML rapora çevirir |
+| `scripts/contrast.py` | Kod-tarafı WCAG kontrast oranı; AA geçmezse exit 1 (tarayıcı gerekmez) |
+
+## Nasıl çalışır
 
 ```mermaid
 flowchart LR
     U([URL · URL'ler · sitemap]) --> S["psi_audit.py<br/>stdlib · medyan-of-N · mobil+masaüstü"]
-    S -->|PSI v5 runPagespeed| G[("Google PSI /<br/>Lighthouse + CrUX")]
-    S -.->|--budget aşıldı| GATE{{"CI kapısı<br/>exit 1"}}
-    G --> J[("JSON<br/>skorlar · CWV · details kanıt<br/>screenshots · geo · pages")]
-    J --> M{{"Claude + references/<br/>→ önceliklendirilmiş plan .md"}}
-    J --> D["psi_diff.py<br/>öncesi → sonrası"]
-    J --> H["psi_report.py<br/>tek-dosya HTML"]
-    C["claude-seo<br/>(opsiyonel)"] -. ekstra derinlik .-> M
+    S -->|PSI v5| G[("Google PSI /<br/>Lighthouse + CrUX")]
+    S -.->|--budget aşıldı| GATE{{"CI kapısı · exit 1"}}
+    G --> J[("JSON<br/>skorlar · CWV · details · screenshots · geo · pages")]
+    J --> M{{"Claude + references/<br/>önceliklendirilmiş plan .md"}}
+    J --> D["psi_diff.py"]
+    J --> H["psi_report.py"]
 ```
 
-**Ölçüm** betikten (PSI API), **derinlik** yerleşik `references/`'tan gelir; Claude ikisini tek plana
-birleştirir. `psi_diff` / `psi_report` aynı JSON'u tüketir. `claude-seo` kuruluysa üstüne ekstra derinlik ekler.
+Ölçüm betikten, derinlik yerleşik `references/`'tan gelir; Claude ikisini tek plana birleştirir.
 
-## Plan formatı (çıktı)
+## PSI ve diğer araçlara göre konum
 
-1. **Özet** — URL, tarih, strateji, kategori skor tablosu, bulgu sayıları.
-2. **Core Web Vitals** — LCP / INP (veya TBT) / CLS için lab + saha + etiket.
-3. **Öncelikli aksiyonlar** — etki × efor, ilk 5-10.
-4. **Tüm performans bulguları** — grup grup + 3. taraf + en ağır kaynaklar.
-5. **SEO / Projeye Özel Aksiyonlar** — `references/` derinliğinden (+ claude-seo kuruluysa).
-6. **Erişilebilirlik & En İyi Uygulamalar** — her bulguda somut kanıt (element + değer → hedef).
-7. **Teknolojiye özel notlar** — `stackPacks`.
-8. **Sonraki adımlar / tekrar test** — değişiklik **canlıya çıktıktan sonra** yeniden test (+ `psi_diff`).
+Sadece skoruna bakacaksan pagespeed.web.dev yeterli. Fark, PSI sayfasının yapmadığı işlerde:
 
-Örnek iskelet: [`references/ornek_plan_iskeleti.md`](references/ornek_plan_iskeleti.md).
+| | pagespeed.web.dev | Lighthouse CI | Unlighthouse | pagespeed-plan |
+|---|:---:|:---:|:---:|:---:|
+| Önceliklendirilmiş plan | ham liste | — | — | ✓ |
+| Somut kanıt (element/değer) | UI'da | — | kısmi | metin (ajan okur) |
+| CI bütçe kapısı | — | ✓ | ✓ | ✓ |
+| Öncesi/sonrası diff | — | ✓ | kısmi | ✓ |
+| Çoklu sayfa / sitemap | — | ✓ | ✓ | ✓ |
+| Tek-dosya HTML rapor | kendi UI | sunucu | ✓ | ✓ |
+| GEO / llms.txt | — | — | — | ✓ |
+| Kurulum yükü | — | Node | Node+Chrome | sıfır-pip |
 
-## Yerleşik derinlik (`references/`)
+## Plan çıktısı
+
+Üretilen Markdown; özet skorlar, Core Web Vitals, etki×efor öncelikleri, tüm performans bulguları,
+SEO/erişilebilirlik aksiyonları (her biri somut kanıtla), teknolojiye özel notlar ve dağıtım sonrası
+tekrar-test adımını içerir. Örnek: [`references/ornek_plan_iskeleti.md`](references/ornek_plan_iskeleti.md).
+
+## Yerleşik derinlik
+
+SEO/teknik/erişilebilirlik derinliği `references/` altında yereldir; `claude-seo` gerekmez
+(kuruluysa opsiyonel ek derinlik için kullanılır).
 
 | Dosya | İçerik |
 |---|---|
 | [`core-web-vitals-derin.md`](references/core-web-vitals-derin.md) | LCP alt-parçaları, INP/CLS kırılımı, eşikler, CrUX tuzakları |
-| [`teknik-seo-derin.md`](references/teknik-seo-derin.md) | Crawlability, indexability, güvenlik, mobil, JS render + AI-crawler tablosu |
-| [`seo-performans-ajan.md`](references/seo-performans-ajan.md) | Performans teşhis yöntemi + darboğaz kataloğu |
-| [`schema-ve-erisilebilirlik.md`](references/schema-ve-erisilebilirlik.md) | JSON-LD şablonları + WCAG/a11y eşleme (kontrast/tap-target/alt) |
-
-## Betikler
-
-| Betik | İş |
-|---|---|
-| `scripts/psi_audit.py` | Denetim + JSON (tek/çoklu URL, `--sitemap`, `--screenshots`, `--geo`, `--budget`) |
-| `scripts/psi_diff.py` | İki denetimi karşılaştır (öncesi → sonrası); `--fail-on-regression` |
-| `scripts/psi_report.py` | JSON → kendine-yeter tek-dosya HTML rapor |
-| `scripts/contrast.py` | Kod-tarafı WCAG kontrast (chrome gerekmez); AA geçmezse exit 1 |
+| [`teknik-seo-derin.md`](references/teknik-seo-derin.md) | Crawlability, indexability, güvenlik, mobil, JS render, AI-crawler |
+| [`seo-performans-ajan.md`](references/seo-performans-ajan.md) | Performans teşhis yöntemi ve darboğaz kataloğu |
+| [`schema-ve-erisilebilirlik.md`](references/schema-ve-erisilebilirlik.md) | JSON-LD şablonları, WCAG/a11y eşlemesi |
 
 ## Roadmap
 
-- 🌱 Karbon / CO₂ tahmini (byte'lardan)
-- 📈 CrUX 25-hafta saha trendi (iyileşiyor mu/kötüleşiyor mu)
-- 🧪 Opsiyonel yerel Lighthouse (`npx lighthouse`, kota-bağımsız)
+Karbon/CO₂ tahmini · CrUX 25-hafta saha trendi · opsiyonel yerel Lighthouse (kota-bağımsız).
 
-## Opsiyonel: claude-seo ile derinleştirme
+## Lisans ve atıf
 
-[`claude-seo`](https://github.com/AgriciDaniel/claude-seo) **kuruluysa**, skill onu opsiyonel olarak
-çağırıp çıktısını yerleşik derinliğe **ek** olarak entegre eder. Kurulu değilse hiçbir uyarı/eksik olmaz.
-
-## Lisans & atıf
-
-MIT — bkz. [`LICENSE`](LICENSE). `references/` içeriği `claude-seo` v2.2.0 (AgriciDaniel, MIT)
-materyalinden türetilip PageSpeed-odaklı Türkçeye uyarlanmıştır; atıf: [`NOTICE.md`](NOTICE.md).
-
-## Katkı
-
-Issue/PR açabilirsin. Betik değişikliklerinde **stdlib-only** ilkesini koru;
-`python3 scripts/test_psi_audit.py` öz-kontrolü geçmeli.
+MIT — [`LICENSE`](LICENSE). `references/` içeriği `claude-seo` v2.2.0 (AgriciDaniel, MIT)
+materyalinden türetilmiştir; atıf: [`NOTICE.md`](NOTICE.md). Katkı için betiklerde stdlib-only
+ilkesini koru ve `python3 scripts/test_psi_audit.py` öz-kontrolünü geçir.
