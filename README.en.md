@@ -29,10 +29,13 @@ and a prioritized plan an agent can read and act on — all in plain Python, wit
 - [Install](#install)
 - [Usage](#usage)
 - [Modes and scripts](#modes-and-scripts)
+- [CI (GitHub Actions)](#ci-github-actions)
 - [How it works](#how-it-works)
 - [Where it fits vs other tools](#where-it-fits-vs-other-tools)
-- [Plan output](#plan-output)
+- [Example output](#example-output)
+- [Configuration](#configuration)
 - [Built-in depth](#built-in-depth)
+- [FAQ](#faq)
 - [Roadmap](#roadmap)
 - [License and attribution](#license-and-attribution)
 
@@ -78,7 +81,26 @@ For every flag plus `psi_diff`/`contrast`, see [Modes and scripts](#modes-and-sc
 | `scripts/psi_report.py` | Renders the JSON into a self-contained single-file HTML report |
 | `scripts/contrast.py` | Code-side WCAG contrast ratio; exits 1 if AA fails (no browser needed) |
 
+## CI (GitHub Actions)
+
+If a `--budget` threshold is exceeded, `psi_audit.py` returns **exit 1** and fails the build:
+
+```yaml
+- name: PageSpeed budget gate
+  run: |
+    python3 scripts/psi_audit.py https://example.com \
+      --strategy mobile --runs 1 --budget "perf=90,lcp=2500,cls=0.1"
+```
+
+For a post-deploy regression gate, compare two runs:
+`python3 scripts/psi_diff.py old.json new.json --fail-on-regression`.
+
 ## How it works
+
+<p align="center"><img src="assets/schema.png" alt="pagespeed-plan flow diagram" width="100%"></p>
+
+<details>
+<summary>Text-based diagram (Mermaid)</summary>
 
 ```mermaid
 flowchart LR
@@ -98,6 +120,8 @@ flowchart LR
     P([previous JSON]) --> D["psi_diff.py<br/>before → after · exit 1 on regression"]
     J --> D
 ```
+
+</details>
 
 `psi_audit.py` gets lab data from PSI and field data from CrUX; `--geo`/`--sitemap`/`--from-robots` are
 fetched directly from the target site. The same JSON feeds `--budget` (CI gate), `psi_plan.py` (deterministic
@@ -120,12 +144,48 @@ page doesn't do:
 | GEO / llms.txt | — | — | — | ✓ |
 | Setup cost | — | Node | Node+Chrome | zero-pip |
 
-## Plan output
+## Example output
 
-The generated Markdown covers summary scores, Core Web Vitals, impact×effort priorities, all
-performance findings, SEO/accessibility actions (each with concrete evidence), stack-specific notes,
-and a post-deploy retest step. `psi_plan.py` produces the same skeleton deterministically as a no-LLM
-baseline. Example: [`references/ornek_plan_iskeleti.md`](references/ornek_plan_iskeleti.md).
+The self-contained HTML report from `psi_report.py` (score cards, CWV, priorities, evidence-backed findings):
+
+<p align="center"><img src="assets/report-ornek.png" alt="Example HTML report" width="82%"></p>
+
+The Markdown plan covers summary scores, Core Web Vitals, impact×effort priorities, all performance
+findings, SEO/accessibility actions (each with concrete evidence), and a post-deploy retest step.
+A short excerpt:
+
+```markdown
+## 3. Priority actions (impact × effort)
+| # | Action | Impact | Effort | Est. gain | Audit |
+|---|---|---|---|---|---|
+| 1 | Defer render-blocking resources | High | High | ~1100 ms | render-blocking-resources |
+
+### Accessibility — 1 to fix
+- **Low contrast** (color-contrast) — Darken the colors.
+  - element: button.cta — <button class='cta'>Buy</button> · contrast: 2.1
+```
+
+`psi_plan.py` produces the same skeleton deterministically (no LLM). Full example:
+[`references/ornek_plan_iskeleti.md`](references/ornek_plan_iskeleti.md).
+
+## Configuration
+
+`psi_audit.py` flags:
+
+| Flag | Default | Description |
+|---|---|---|
+| `--strategy` | `both` | `mobile` · `desktop` · `both` |
+| `--runs` | 3 (multi: 1) | Runs per strategy; median is taken |
+| `--sitemap URL` | — | Crawl a sitemap.xml |
+| `--from-robots URL` | — | Discover sitemaps from robots.txt |
+| `--max-pages` | 10 | Page cap in multi mode |
+| `--budget` | — | Exit 1 on threshold breach (CI) |
+| `--screenshots DIR` | — | Write screenshot + filmstrip |
+| `--geo` | — | robots.txt AI-crawler + llms.txt check |
+| `--history FILE` | — | Append the run to a JSONL (trend) |
+| `--locale` | `tr` | Report language |
+| `--api-key` | `PSI_API_KEY` | PSI API key (for quota) |
+| `--out FILE` | — | Also write the JSON to a file |
 
 ## Built-in depth
 
@@ -140,6 +200,21 @@ SEO/technical/accessibility depth lives locally under `references/`; `claude-seo
 | [`schema-ve-erisilebilirlik.md`](references/schema-ve-erisilebilirlik.md) | JSON-LD templates, WCAG/a11y mapping |
 
 > Reference files are written in Turkish; the code and this README are English/Turkish.
+
+## FAQ
+
+**Do I need an API key?** No — it works without one, but Google applies a low rate limit.
+Since median-of-3 makes several requests, `PSI_API_KEY` is recommended (free: Google Cloud Console).
+
+**Hit the quota (429)?** Drop to `--runs 1`, add `PSI_API_KEY`, or use `--strategy mobile` to halve the requests.
+
+**Why this over PSI?** PSI gives you the score and recommendations; here you get a CI budget gate, diff,
+sitemap crawl, a shareable report, and an agent-actionable prioritized plan. See the
+[comparison table](#where-it-fits-vs-other-tools).
+
+**Does it modify the site?** No — read-only (PSI + robots.txt/llms.txt).
+
+**Node/Chrome required?** No. Every script is Python stdlib; no `pip install`.
 
 ## Roadmap
 

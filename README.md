@@ -29,10 +29,13 @@ bir ajanın okuyup uygulayabileceği önceliklendirilmiş bir plana çevirir —
 - [Kurulum](#kurulum)
 - [Kullanım](#kullanım)
 - [Modlar ve betikler](#modlar-ve-betikler)
+- [CI (GitHub Actions)](#ci-github-actions)
 - [Nasıl çalışır](#nasıl-çalışır)
 - [PSI ve diğer araçlara göre konum](#psi-ve-diğer-araçlara-göre-konum)
-- [Plan çıktısı](#plan-çıktısı)
+- [Örnek çıktı](#örnek-çıktı)
+- [Yapılandırma](#yapılandırma)
 - [Yerleşik derinlik](#yerleşik-derinlik)
+- [SSS](#sss)
 - [Roadmap](#roadmap)
 - [Lisans ve atıf](#lisans-ve-atıf)
 
@@ -78,7 +81,26 @@ Tüm bayraklar ve `psi_diff`/`contrast` için [Modlar ve betikler](#modlar-ve-be
 | `scripts/psi_report.py` | JSON'u kendine-yeter tek-dosya HTML rapora çevirir |
 | `scripts/contrast.py` | Kod-tarafı WCAG kontrast oranı; AA geçmezse exit 1 (tarayıcı gerekmez) |
 
+## CI (GitHub Actions)
+
+`--budget` eşiği aşılırsa `psi_audit.py` **exit 1** döner ve yapıyı kırar:
+
+```yaml
+- name: PageSpeed bütçe kapısı
+  run: |
+    python3 scripts/psi_audit.py https://ornek.com \
+      --strategy mobile --runs 1 --budget "perf=90,lcp=2500,cls=0.1"
+```
+
+Dağıtım sonrası regresyon kapısı için iki çalışmayı karşılaştır:
+`python3 scripts/psi_diff.py eski.json yeni.json --fail-on-regression`.
+
 ## Nasıl çalışır
+
+<p align="center"><img src="assets/schema.png" alt="pagespeed-plan akış şeması" width="100%"></p>
+
+<details>
+<summary>Metin tabanlı şema (Mermaid)</summary>
 
 ```mermaid
 flowchart LR
@@ -98,6 +120,8 @@ flowchart LR
     P([önceki JSON]) --> D["psi_diff.py<br/>öncesi → sonrası · regresyonda exit 1"]
     J --> D
 ```
+
+</details>
 
 `psi_audit.py` ölçümü PSI'den, saha verisini CrUX'tan alır; `--geo`/`--sitemap`/`--from-robots` doğrudan
 hedef siteden çeker. Aynı JSON'u `--budget` (CI kapısı), `psi_plan.py` (deterministik plan), `psi_report.py`
@@ -119,12 +143,48 @@ Sadece skoruna bakacaksan pagespeed.web.dev yeterli. Fark, PSI sayfasının yapm
 | GEO / llms.txt | — | — | — | ✓ |
 | Kurulum yükü | — | Node | Node+Chrome | sıfır-pip |
 
-## Plan çıktısı
+## Örnek çıktı
 
-Üretilen Markdown; özet skorlar, Core Web Vitals, etki×efor öncelikleri, tüm performans bulguları,
-SEO/erişilebilirlik aksiyonları (her biri somut kanıtla), teknolojiye özel notlar ve dağıtım sonrası
-tekrar-test adımını içerir. Aynı iskeleti `psi_plan.py` LLM olmadan, deterministik bir baseline olarak da
-üretir. Örnek: [`references/ornek_plan_iskeleti.md`](references/ornek_plan_iskeleti.md).
+`psi_report.py` ile üretilen kendine-yeter HTML rapor (skor kartları, CWV, öncelikler, kanıtlı bulgular):
+
+<p align="center"><img src="assets/report-ornek.png" alt="Örnek HTML rapor" width="82%"></p>
+
+Markdown planı; özet skorlar, Core Web Vitals, etki×efor öncelikleri, tüm performans bulguları,
+SEO/erişilebilirlik aksiyonları (her biri somut kanıtla) ve dağıtım sonrası tekrar-test adımını içerir.
+Kısa bir kesit:
+
+```markdown
+## 3. Öncelikli aksiyonlar (etki × efor)
+| # | Aksiyon | Etki | Efor | Tahmini kazanç | Denetim |
+|---|---|---|---|---|---|
+| 1 | İşleme engelleyen kaynakları ertele | Yüksek | Yüksek | ~1100 ms | render-blocking-resources |
+
+### Erişilebilirlik — 1 düzeltilecek
+- **Kontrast düşük** (color-contrast) — Renkleri koyulaştır.
+  - element: button.cta — <button class='cta'>Al</button> · contrast: 2.1
+```
+
+Aynı iskeleti `psi_plan.py` LLM olmadan üretir. Tam örnek:
+[`references/ornek_plan_iskeleti.md`](references/ornek_plan_iskeleti.md).
+
+## Yapılandırma
+
+`psi_audit.py` bayrakları:
+
+| Bayrak | Varsayılan | Açıklama |
+|---|---|---|
+| `--strategy` | `both` | `mobile` · `desktop` · `both` |
+| `--runs` | 3 (çoklu: 1) | Strateji başına koşu; medyan alınır |
+| `--sitemap URL` | — | sitemap.xml'i tara |
+| `--from-robots URL` | — | robots.txt'ten sitemap keşfet |
+| `--max-pages` | 10 | Çoklu modda sayfa üst sınırı |
+| `--budget` | — | Eşik ihlalinde exit 1 (CI) |
+| `--screenshots DIR` | — | Ekran görüntüsü + filmstrip yaz |
+| `--geo` | — | robots.txt AI-crawler + llms.txt kontrolü |
+| `--history FILE` | — | Koşuyu JSONL'e ekle (trend) |
+| `--locale` | `tr` | Rapor dili |
+| `--api-key` | `PSI_API_KEY` | PSI API anahtarı (kota için) |
+| `--out FILE` | — | JSON'u dosyaya da yaz |
 
 ## Yerleşik derinlik
 
@@ -137,6 +197,21 @@ SEO/teknik/erişilebilirlik derinliği `references/` altında yereldir; `claude-
 | [`teknik-seo-derin.md`](references/teknik-seo-derin.md) | Crawlability, indexability, güvenlik, mobil, JS render, AI-crawler |
 | [`seo-performans-ajan.md`](references/seo-performans-ajan.md) | Performans teşhis yöntemi ve darboğaz kataloğu |
 | [`schema-ve-erisilebilirlik.md`](references/schema-ve-erisilebilirlik.md) | JSON-LD şablonları, WCAG/a11y eşlemesi |
+
+## SSS
+
+**API anahtarı gerekli mi?** Hayır — anahtarsız çalışır, ama Google düşük hız limiti uygular.
+Medyan-of-3 birden çok istek attığı için `PSI_API_KEY` önerilir (ücretsiz: Google Cloud Console).
+
+**Kota dolarsa (429)?** `--runs 1`'e düş, `PSI_API_KEY` ekle veya `--strategy mobile` ile istek sayısını yarıya indir.
+
+**Neden PSI yerine bu?** PSI skoru ve önerileri verir; burada CI bütçe kapısı, diff, sitemap taraması,
+paylaşılabilir rapor ve bir ajanın uygulayabileceği önceliklendirilmiş plan var. Bkz.
+[konum tablosu](#psi-ve-diğer-araçlara-göre-konum).
+
+**Siteyi değiştirir mi?** Hayır — yalnızca okur (PSI + robots.txt/llms.txt).
+
+**Node/Chrome gerekir mi?** Hayır. Tüm betikler Python stdlib; `pip install` yok.
 
 ## Roadmap
 
